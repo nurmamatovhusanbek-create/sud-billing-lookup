@@ -1,0 +1,3170 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sud Billing · Open Design Redesign Preview</title>
+<meta name="description" content="Dark-theme bento-grid redesign preview of the Sud Billing Lookup app — Open Design principles applied." />
+
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Inter from Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Lucide icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:       '#06080d',
+          'ink-2':   '#0a0e16',
+          'ink-3':   '#0e131c',
+          'ink-4':   '#121826',
+          accent:    '#38bdf8',
+          'accent-2':'#0ea5e9',
+          'accent-3':'#818cf8',
+          'accent-soft': 'rgba(56, 189, 248, 0.12)',
+          line:      'rgba(255, 255, 255, 0.07)',
+          'line-2':  'rgba(255, 255, 255, 0.11)',
+          fg:        'rgba(255, 255, 255, 0.95)',
+          'fg-2':    'rgba(255, 255, 255, 0.60)',
+          'fg-3':    'rgba(255, 255, 255, 0.36)',
+        },
+        fontFamily: {
+          sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+        letterSpacing: {
+          'tightest-2': '-0.04em',
+          'tightest':   '-0.03em',
+          'tight-2':    '-0.02em',
+        },
+        boxShadow: {
+          'accent-glow': '0 8px 28px rgba(56, 189, 248, 0.30)',
+          'card-hover':  '0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(56, 189, 248, 0.18)',
+          'inner-line':  'inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+/* ============================================================
+   DESIGN TOKENS — "Open Design / Aurora Dark"
+   Inspired by: Apple (binary contrast, pill geometry),
+                Bento (modular grid), Bold (heavyweight type),
+                Agentic (single bold accent).
+   Accent: #38bdf8 (sky cyan) — cold, premium, infinite.
+   Palette: cold cyan #38bdf8 (primary), indigo #818cf8 (secondary),
+            emerald #34d399 (success/paid), sky #38bdf8 (info),
+            violet #a78bfa (appeal/admin), teal #2dd4bf (used),
+            rose #f43f5e (cancelled/criminal). NO warm tones.
+   ============================================================ */
+
+*{ box-sizing: border-box; }
+html{ -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body{
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #06080d;
+  color: rgba(255, 255, 255, 0.95);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+::selection{ background: rgba(56, 189, 248, 0.32); color: #fff; }
+
+:focus-visible{
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+button{ font-family: inherit; cursor: pointer; }
+a{ color: inherit; }
+
+/* ============================================================
+   BACKGROUND — ASCII art animated field (flow / ripples / life)
+   Two stacked <pre> layers cross-fade between effects; the
+   radial vignette keeps the center readable while darkening
+   the edges so the bento content stays legible.
+   ============================================================ */
+#ascii-stage{
+  position: fixed; inset: 0; z-index: -2;
+  background: #06080d; overflow: hidden;
+}
+.ascii-layer{
+  position: absolute; inset: 0; margin: 0; padding: 0;
+  white-space: pre; overflow: hidden;
+  letter-spacing: 0; user-select: none; pointer-events: none;
+  will-change: opacity, contents; /* opacity is driven per-frame by JS */
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  line-height: 1;
+}
+.ascii-vignette{
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(6,8,13,0.85) 100%);
+}
+
+/* ============================================================
+   LAYOUT SHELL
+   ============================================================ */
+.shell{ min-height: 100vh; display: flex; flex-direction: column; }
+.wrap{ width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+@media (min-width: 640px){ .wrap{ padding: 0 28px; } }
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.app-header{
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(6, 8, 13, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.app-header::after{
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.45) 25%, rgba(56, 189, 248, 0.45) 75%, transparent);
+  opacity: 0.5;
+}
+.header-inner{
+  height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.brand{ display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand-mark{
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(155deg, #121826 0%, #06080d 100%);
+  color: #38bdf8;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.brand-mark::after{
+  content: ''; position: absolute; inset: 0; border-radius: 12px; pointer-events: none;
+  background: radial-gradient(60% 60% at 30% 30%, rgba(56, 189, 248, 0.22), transparent 70%);
+}
+.brand-text{ min-width: 0; }
+.brand-title{
+  font-size: 15px; font-weight: 700; letter-spacing: -0.02em; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brand-sub{ font-size: 11px; color: rgba(255, 255, 255, 0.42); display: none; }
+@media (min-width: 640px){ .brand-sub{ display: block; } }
+
+.header-right{ display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+.tor-badge{
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; letter-spacing: -0.01em;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+  transition: all 0.2s ease;
+}
+.tor-badge:hover{ background: rgba(16, 185, 129, 0.14); }
+.tor-badge .dot{
+  width: 7px; height: 7px; border-radius: 50%; background: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.8);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot{ 0%, 100%{ opacity: 1; transform: scale(1); } 50%{ opacity: 0.5; transform: scale(0.85); } }
+
+.ext-link{
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.55);
+  transition: color 0.2s ease;
+  padding: 6px 10px; border-radius: 999px;
+}
+.ext-link:hover{ color: #fff; background: rgba(255, 255, 255, 0.04); }
+.ext-link svg{ width: 12px; height: 12px; }
+
+/* ============================================================
+   TABS — pill bar with sliding active indicator
+   ============================================================ */
+.tabs-bar{
+  display: inline-flex; gap: 4px; padding: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  position: relative;
+}
+.tab-pill{
+  position: absolute;
+  top: 5px; left: 5px;
+  height: calc(100% - 10px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.95) 0%, rgba(129, 140, 248, 0.95) 100%);
+  box-shadow: 0 6px 22px rgba(56, 189, 248, 0.32), inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), width 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+.tab-btn{
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px; min-height: 42px;
+  font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.55);
+  border: 0; background: transparent;
+  border-radius: 999px;
+  transition: color 0.3s ease, transform 0.1s ease;
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+}
+.tab-btn:hover{ color: rgba(255, 255, 255, 0.85); }
+.tab-btn:active{ transform: translateY(1px); }
+.tab-btn.is-active{
+  color: #fff;
+  background: rgba(56, 189, 248, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+              inset 0 -1px 0 rgba(56,189,248,0.15),
+              0 0 20px rgba(56,189,248,0.12);
+}
+.tab-btn svg, .tab-btn [data-lucide]{ width: 18px; height: 18px; }
+
+/* ============================================================
+   CARDS — bento blocks
+   ============================================================ */
+.bento{
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.06),
+              inset 0 0 0 1px rgba(255,255,255,0.03),
+              0 4px 24px rgba(0,0,0,0.3);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+  position: relative;
+  will-change: transform, opacity;
+}
+.bento::before{
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%;
+  background: radial-gradient(ellipse at 30% 0%, rgba(255,255,255,0.04), transparent 60%);
+  pointer-events: none; border-radius: 20px 20px 0 0; z-index: 0;
+}
+.bento > *{ position: relative; z-index: 1; }
+.bento-hover:hover{
+  transform: translateY(-3px);
+  border-color: rgba(56, 189, 248, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.08),
+              inset 0 0 0 1px rgba(255,255,255,0.04),
+              0 16px 48px rgba(0, 0, 0, 0.5),
+              0 0 0 1px rgba(56, 189, 248, 0.18);
+}
+.bento-strong{
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.02) 100%);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid transparent;
+  border-radius: 24px;
+  position: relative; overflow: hidden;
+  background-clip: padding-box;
+}
+.bento-strong::before{
+  content: ''; position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px;
+  background: conic-gradient(from 0deg, rgba(56,189,248,0.15), rgba(129,140,248,0.15), rgba(52,211,153,0.15), rgba(56,189,248,0.15));
+  border-radius: 24px; z-index: -1;
+  animation: iridescent 8s linear infinite;
+}
+@keyframes iridescent { to { transform: rotate(360deg); } }
+.bento-strong::after{
+  content: ''; position: absolute; top: -100px; right: -100px; width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(56,189,248,0.10), transparent 70%);
+  pointer-events: none; border-radius: 50%;
+}
+
+/* Bento grid for summary cards */
+.bento-grid-6{
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (min-width: 768px){ .bento-grid-6{ grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1100px){ .bento-grid-6{ grid-template-columns: repeat(6, 1fr); } }
+
+.bento-grid-4{
+  display: grid; gap: 14px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px){ .bento-grid-4{ grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px){ .bento-grid-4{ grid-template-columns: repeat(4, 1fr); } }
+
+/* ============================================================
+   BUTTONS — pill geometry
+   ============================================================ */
+.btn{
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 48px; padding: 0 22px;
+  font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
+  border: 0; border-radius: 999px;
+  transition: transform 0.1s ease, background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+.btn:active{ transform: scale(0.97); }
+.btn-primary{
+  background: linear-gradient(180deg, #38bdf8 0%, #38bdf8 100%);
+  color: #fff;
+  box-shadow: 0 8px 28px rgba(56, 189, 248, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+}
+.btn-primary:hover{ background: linear-gradient(180deg, #7dd3fc 0%, #0ea5e9 100%); box-shadow: 0 10px 32px rgba(56, 189, 248, 0.45); }
+.btn-primary:disabled{
+  background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.32); cursor: not-allowed; box-shadow: none;
+}
+.btn-ghost{
+  background: rgba(255, 255, 255, 0.04); color: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  height: 36px; padding: 0 14px; font-size: 13px;
+}
+.btn-ghost:hover{ background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(255, 255, 255, 0.16); }
+.btn-icon{
+  width: 32px; height: 32px; padding: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.btn-icon:hover{ background: rgba(56, 189, 248, 0.12); color: #7dd3fc; border-color: rgba(56, 189, 248, 0.3); }
+
+/* ============================================================
+   INPUTS
+   ============================================================ */
+.input{
+  width: 100%; height: 48px; padding: 0 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: #fff; font-size: 15px;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  font-family: inherit;
+}
+.input::placeholder{ color: rgba(255, 255, 255, 0.32); }
+.input:focus{
+  outline: 0;
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.16);
+}
+.input-mono{ font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+/* ============================================================
+   BADGES — pill with tint
+   ============================================================ */
+.badge{
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 11px;
+  border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: -0.005em;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.badge svg, .badge [data-lucide]{ width: 13px; height: 13px; }
+
+/* COLD palette only — NO amber/orange/yellow */
+.b-paid      { background: rgba(52, 211, 153, 0.10);  border-color: rgba(52, 211, 153, 0.28);  color: #34d399; }
+.b-unpaid    { background: rgba(56, 189, 248, 0.10);  border-color: rgba(56, 189, 248, 0.28);  color: #38bdf8; }
+.b-partial   { background: rgba(129, 140, 248, 0.10); border-color: rgba(129, 140, 248, 0.28); color: #818cf8; }
+.b-cancelled { background: rgba(244, 63, 94, 0.10);   border-color: rgba(244, 63, 94, 0.28);   color: #f43f5e; }
+.b-checking  { background: rgba(56, 189, 248, 0.10);   border-color: rgba(56, 189, 248, 0.28);   color: #38bdf8; }
+.b-used      { background: rgba(45, 212, 191, 0.10);   border-color: rgba(45, 212, 191, 0.28);   color: #2dd4bf; }
+.b-mib       { background: rgba(167, 139, 250, 0.10);  border-color: rgba(167, 139, 250, 0.28);  color: #a78bfa; }
+
+.b-accent    { background: rgba(56, 189, 248, 0.12);     border-color: rgba(56, 189, 248, 0.32);    color: #7dd3fc; }
+.b-neutral   { background: rgba(255, 255, 255, 0.04);  border-color: rgba(255, 255, 255, 0.10); color: rgba(255, 255, 255, 0.6); }
+.b-court-econ{ background: rgba(52, 211, 153, 0.10);   border-color: rgba(52, 211, 153, 0.28);   color: #34d399; }
+.b-court-civ { background: rgba(56, 189, 248, 0.10);   border-color: rgba(56, 189, 248, 0.28);   color: #38bdf8; }
+.b-court-crim{ background: rgba(244, 63, 94, 0.10);    border-color: rgba(244, 63, 94, 0.28);    color: #f43f5e; }
+.b-court-adm { background: rgba(167, 139, 250, 0.10);  border-color: rgba(167, 139, 250, 0.28);  color: #a78bfa; }
+
+/* ============================================================
+   MONEY CELLS — inside bill cards
+   ============================================================ */
+.money-cell{
+  border-radius: 14px; padding: 12px 14px; min-width: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), inset 0 -1px 0 rgba(255,255,255,0.04);
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.money-cell::before{
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 40%;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent);
+  pointer-events: none; border-radius: 14px 14px 0 0;
+}
+.money-cell:hover{ border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.045); }
+.money-cell .label{
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  display: flex; align-items: center; gap: 5px;
+}
+.money-cell .label [data-lucide], .money-cell .label svg{ width: 12px; height: 12px; opacity: 0.7; flex-shrink: 0; }
+.money-cell .value{
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
+  font-weight: 700; letter-spacing: -0.02em;
+  margin-top: 6px; color: #fff; line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.money-cell .sub{ font-size: 11px; color: rgba(255, 255, 255, 0.42); font-weight: 500; }
+
+.money-cell.is-paid    { background: rgba(52, 211, 153, 0.06);  border-color: rgba(52, 211, 153, 0.22); }
+.money-cell.is-paid .value{ color: #34d399; }
+.money-cell.is-unpaid  { background: rgba(56, 189, 248, 0.06);  border-color: rgba(56, 189, 248, 0.22); }
+.money-cell.is-unpaid .value{ color: #38bdf8; }
+.money-cell.is-accent  { background: rgba(56, 189, 248, 0.06);    border-color: rgba(56, 189, 248, 0.22); }
+.money-cell.is-accent .value{ color: #7dd3fc; }
+
+/* ============================================================
+   LUCIDE ICON BASELINE
+   Lucide icons use stroke="currentColor". Color is set via CSS `color`
+   property (or text-* tailwind classes). Width/height via w-*/h-*.
+   ============================================================ */
+[data-lucide]{ stroke-width: 2; flex-shrink: 0; }
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fadeUp{
+  from{ opacity: 0; transform: translateY(12px) scale(0.98); backdrop-filter: blur(0); }
+  to  { opacity: 1; transform: translateY(0) scale(1); backdrop-filter: blur(20px); }
+}
+.anim-fade-up{ animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-fade-up-1{ animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both; }
+.anim-fade-up-2{ animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
+.anim-fade-up-3{ animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both; }
+.anim-fade-up-4{ animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both; }
+.anim-fade-up-5{ animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.30s both; }
+.anim-fade-up-6{ animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.36s both; }
+
+/* Smooth scale-in for cards appearing dynamically */
+@keyframes scaleIn{
+  from{ opacity: 0; transform: scale(0.95) translateY(8px); }
+  to  { opacity: 1; transform: scale(1) translateY(0); }
+}
+.anim-scale-in{ animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Glow pulse for active states */
+@keyframes glowPulse{
+  0%, 100%{ box-shadow: 0 0 20px rgba(56, 189, 248, 0.15); }
+  50%     { box-shadow: 0 0 40px rgba(56, 189, 248, 0.30); }
+}
+.glow-pulse{ animation: glowPulse 3s ease-in-out infinite; }
+
+/* Shimmer for skeletons */
+@keyframes shimmer{
+  0%  { background-position: -480px 0; }
+  100%{ background-position: 480px 0; }
+}
+.shimmer{
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0%, rgba(56, 189, 248, 0.06) 50%, rgba(255, 255, 255, 0.025) 100%);
+  background-size: 960px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes spin{ to{ transform: rotate(360deg); } }
+.spin{ animation: spin 0.8s linear infinite; }
+
+/* Ripple effect on button press */
+@keyframes ripple{
+  to{ transform: scale(2.5); opacity: 0; }
+}
+.ripple{
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: rgba(255, 255, 255, 0.3);
+  animation: ripple 0.6s ease-out;
+}
+
+@keyframes pulseGlow{
+  0%, 100%{ box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.5); }
+  50%     { box-shadow: 0 0 0 10px rgba(56, 189, 248, 0); }
+}
+.pulse-glow{ animation: pulseGlow 1.8s ease-in-out infinite; }
+
+@keyframes barFill{
+  from{ width: 0; }
+}
+
+/* Slide-down for expand/collapse content — smoother with max-height transition */
+.slide-down{
+  overflow: hidden;
+  animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes slideDown{
+  from{ opacity: 0; max-height: 0; transform: translateY(-6px); }
+  to  { opacity: 1; max-height: 2000px; transform: translateY(0); }
+}
+
+/* Slide-up collapse */
+.slide-up{
+  overflow: hidden;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 1, 1) both;
+}
+@keyframes slideUp{
+  from{ opacity: 1; max-height: 2000px; }
+  to  { opacity: 0; max-height: 0; }
+}
+
+/* ============================================================
+   TAB PANEL — instant swap + staggered child fade-up
+   Outgoing panel is hidden immediately; incoming panel is shown
+   at once and its `.anim-fade-up-*` children replay their
+   staggered fade-up animations, so the swap feels fast (~0.3s)
+   but still smooth.
+   ============================================================ */
+.tab-panel{ display: none; }
+.tab-panel.is-active{
+  display: block;
+  animation: tabFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes tabFadeIn{
+  from{ opacity: 0; transform: translateY(6px); }
+  to  { opacity: 1; transform: translateY(0); }
+}
+
+/* Card hover lift with smooth spring */
+.bento-hover{
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              border-color 0.3s ease,
+              box-shadow 0.3s ease,
+              background 0.3s ease;
+}
+.bento-hover:hover{
+  transform: translateY(-4px);
+  border-color: rgba(56, 189, 248, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(56, 189, 248, 0.15);
+}
+
+/* Button press feedback */
+.btn{ transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease, box-shadow 0.25s ease, color 0.25s ease; }
+.btn:active{ transform: scale(0.96); }
+
+/* Input focus glow ring */
+.input{ transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease; }
+.input:focus{
+  outline: 0;
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.14), 0 0 20px rgba(56, 189, 248, 0.08);
+}
+
+/* Chip toggle smooth */
+.chip{ transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.chip.is-active{
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.40);
+  color: #7dd3fc;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
+}
+
+/* Header subtle shimmer line — animated gradient sweep */
+.app-header::after{
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.5) 25%, rgba(129, 140, 248, 0.5) 50%, rgba(56, 189, 248, 0.5) 75%, transparent);
+  background-size: 200% 100%;
+  animation: headerSweep 4s linear infinite;
+  opacity: 0.6;
+}
+@keyframes headerSweep{
+  0%  { background-position: 200% 0; }
+  100%{ background-position: -200% 0; }
+}
+
+/* Progress bar with flowing gradient */
+.progress-fill{
+  background: linear-gradient(90deg, #38bdf8, #818cf8, #38bdf8);
+  background-size: 200% 100%;
+  animation: progressFlow 2s linear infinite, barFill 0.6s ease;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+}
+@keyframes progressFlow{
+  0%  { background-position: 0% 0; }
+  100%{ background-position: 200% 0; }
+}
+
+/* Brand mark pulsing glow */
+.brand-mark{
+  animation: brandGlow 4s ease-in-out infinite;
+}
+@keyframes brandGlow{
+  0%, 100%{ box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(56, 189, 248, 0); }
+  50%     { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 20px 2px rgba(56, 189, 248, 0.15); }
+}
+.brand-mark::after{
+  background: radial-gradient(60% 60% at 30% 30%, rgba(56, 189, 248, 0.22), transparent 70%);
+}
+
+/* ============================================================
+   SKELETONS (loading)
+   ============================================================ */
+.skel{ border-radius: 16px; }
+.skel-card{
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+}
+
+/* ============================================================
+   PHASE TIMELINE
+   ============================================================ */
+.phase-step{
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: -0.01em;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.42);
+  transition: all 0.3s ease;
+}
+.phase-step.is-current{
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+}
+.phase-step.is-done{
+  background: rgba(52, 211, 153, 0.08);
+  border-color: rgba(52, 211, 153, 0.22);
+  color: #34d399;
+}
+.phase-line{
+  width: 16px; height: 1px; background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+}
+.phase-line.is-done{ background: rgba(52, 211, 153, 0.45); }
+
+/* ============================================================
+   FILTER CHIPS
+   ============================================================ */
+.chip{
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px; font-weight: 600; letter-spacing: -0.005em;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.62);
+  transition: all 0.2s ease;
+}
+.chip:hover{ color: #fff; border-color: rgba(255, 255, 255, 0.18); }
+.chip.is-active{
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #7dd3fc;
+}
+.chip .dot{ width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+
+/* ============================================================
+   SELECT (custom wrapper around native select)
+   ============================================================ */
+.select-wrap{ position: relative; }
+.select-wrap select{
+  appearance: none; -webkit-appearance: none;
+  height: 38px; padding: 0 36px 0 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: #fff; font-size: 13px; font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.select-wrap select:hover{ border-color: rgba(255, 255, 255, 0.18); }
+.select-wrap select:focus{ outline: 0; border-color: rgba(56, 189, 248, 0.55); box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.16); }
+.select-wrap select option{ background: #0e131c; color: #fff; }
+.select-wrap::after{
+  content: ''; position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  width: 8px; height: 8px; border-right: 1.5px solid rgba(255, 255, 255, 0.5); border-bottom: 1.5px solid rgba(255, 255, 255, 0.5);
+  transform: translateY(-65%) rotate(45deg); pointer-events: none;
+}
+
+/* ============================================================
+   HEADING SCALE
+   ============================================================ */
+.h-display{
+  font-size: clamp(28px, 4.5vw, 44px);
+  font-weight: 800; letter-spacing: -0.035em;
+  line-height: 1.05; color: #fff;
+}
+.h-eyebrow{
+  font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: #7dd3fc;
+}
+.h-section{
+  font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+/* ============================================================
+   PAGINATION
+   ============================================================ */
+.page-btn{
+  width: 36px; height: 36px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px; font-weight: 600;
+  transition: all 0.2s ease;
+}
+.page-btn:hover:not(:disabled){ background: rgba(255, 255, 255, 0.08); color: #fff; }
+.page-btn.is-active{ background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.4); color: #7dd3fc; }
+.page-btn:disabled{ opacity: 0.35; cursor: not-allowed; }
+
+/* ============================================================
+   INFO ROWS (case detail)
+   ============================================================ */
+.info-row{
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px; padding: 12px 14px;
+  min-width: 0;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.03);
+}
+.info-row:hover{ border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.06), 0 0 12px rgba(56,189,248,0.06); }
+.info-row .label{
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  display: flex; align-items: center; gap: 5px;
+}
+.info-row .label [data-lucide], .info-row .label svg{ width: 12px; height: 12px; opacity: 0.7; flex-shrink: 0; }
+.info-row .value{
+  margin-top: 4px; color: #fff; font-weight: 500; font-size: 14px;
+  word-break: break-word;
+}
+.info-row .value.mono{ font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   MISC
+   ============================================================ */
+.divider{ height: 1px; background: rgba(255, 255, 255, 0.06); border: 0; }
+.divider-vert{ width: 1px; align-self: stretch; background: rgba(255, 255, 255, 0.06); }
+
+/* Skeleton spinner */
+.spinner{
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.22);
+  border-top-color: #38bdf8;
+  animation: spin 0.8s linear infinite;
+}
+.spinner-lg{ width: 24px; height: 24px; border-width: 2.5px; }
+
+/* Scan-line loader — from Uiverse.io by kat_2522
+   Pure CSS scan-line over "Yuklanmoqda" (Uzbek: "Loading"). */
+.scan-loader {
+  max-width: fit-content;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 36px;
+  font-family: 'Inter', sans-serif;
+  position: relative;
+  font-style: italic;
+  font-weight: 600;
+}
+.scan-loader span {
+  animation: cut 2s infinite;
+  transition: 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.scan-loader::after {
+  position: absolute;
+  content: "";
+  width: 100%;
+  height: 5px;
+  border-radius: 4px;
+  background-color: rgba(56, 189, 248, 0.5);
+  top: 0px;
+  filter: blur(10px);
+  animation: scan 2s infinite;
+  left: 0;
+  z-index: 0;
+  transition: 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.scan-loader::before {
+  position: absolute;
+  content: "";
+  width: 100%;
+  height: 4px;
+  border-radius: 4px;
+  background-color: #38bdf8;
+  top: 0px;
+  animation: scan 2s infinite;
+  left: 0;
+  z-index: 1;
+  filter: opacity(0.9);
+  transition: 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes scan {
+  0%   { top: 0px; }
+  25%  { top: 42px; }
+  50%  { top: 0px; }
+  75%  { top: 42px; }
+}
+@keyframes cut {
+  0%   { clip-path: inset(0 0 0 0); }
+  25%  { clip-path: inset(100% 0 0 0); }
+  50%  { clip-path: inset(0 0 100% 0); }
+  75%  { clip-path: inset(0 0 0 0); }
+}
+
+/* Progress bar */
+.progress-track{ height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.progress-fill{
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #7dd3fc);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: barFill 0.6s ease;
+}
+
+/* Hide scrollbar on horizontal lists */
+.no-scrollbar::-webkit-scrollbar{ display: none; }
+.no-scrollbar{ -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Sticky mini-summary */
+.mini-summary{
+  position: sticky; top: 80px; z-index: 30;
+  background: rgba(6, 8, 13, 0.88);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 8px 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+</style>
+</head>
+<body>
+
+<!-- ASCII art animated background (flow field / ripples / Game of Life) -->
+<div id="ascii-stage">
+  <pre class="ascii-layer" id="layerA"></pre>
+  <pre class="ascii-layer" id="layerB"></pre>
+  <div class="ascii-vignette"></div>
+</div>
+<!-- Dark overlay on top of ASCII for text readability -->
+<div style="position:fixed;inset:0;z-index:-1;background:rgba(6,8,13,0.5);pointer-events:none;"></div>
+
+<div class="shell">
+
+  <!-- ====================== HEADER ====================== -->
+  <header class="app-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <div class="brand-mark relative">
+          <i data-lucide="layout-grid" style="width:20px;height:20px;position:relative;z-index:1;"></i>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-title">Sud To'lovlarini Qidiruv</h1>
+          <p class="brand-sub">billing.sud.uz kvitansiyalarini import qiluvchi vosita</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="tor-badge" title="Tor proxy is active">
+          <span class="dot"></span>
+          Tor faol
+        </span>
+        <a class="ext-link" href="https://billing.sud.uz" target="_blank" rel="noopener noreferrer">
+          billing.sud.uz
+          <i data-lucide="external-link" class="w-3 h-3"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ====================== MAIN ====================== -->
+  <main class="wrap py-8 sm:py-12">
+
+    <!-- ====================== TABS ====================== -->
+    <div class="flex justify-center sm:justify-start mb-8 anim-fade-up">
+      <div class="tabs-bar" role="tablist" aria-label="Asosiy bo'limlar" id="tabs-bar">
+        <div class="tab-pill" id="tab-pill"></div>
+        <button class="tab-btn is-active" role="tab" data-tab="bills" aria-selected="true">
+          <i data-lucide="receipt" class="w-[18px] h-[18px]"></i>
+          <span>To'lovlar</span>
+        </button>
+        <button class="tab-btn" role="tab" data-tab="cases" aria-selected="false">
+          <i data-lucide="gavel" class="w-[18px] h-[18px]"></i>
+          <span>Sud ishlari</span>
+        </button>
+        <button class="tab-btn" role="tab" data-tab="hearings" aria-selected="false">
+          <i data-lucide="calendar-days" class="w-[18px] h-[18px]"></i>
+          <span>Sud majlislari</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ====================== BILLS TAB ========================== -->
+    <!-- ============================================================ -->
+    <section class="tab-panel is-active" data-panel="bills" role="tabpanel">
+
+      <!-- ===== SEARCH HERO ===== -->
+      <section class="bento-strong p-8 sm:p-10 mb-8 anim-fade-up">
+        <div class="relative z-10 space-y-5 max-w-2xl">
+          <p class="h-eyebrow">O'zbekiston · billing.sud.uz</p>
+          <h2 class="h-display">
+            Kompaniya nomiga<br>chiqarilgan barcha<br>to'lovlarni import qiling
+          </h2>
+          <p class="text-fg-2 text-sm sm:text-base leading-relaxed">
+            Kompaniyaning STIR raqamini kiriting (9 ta raqam). Ilova billing.sud.uz
+            saytida Yuridik shaxs bo'limini ochadi, captchani yechadi va barcha
+            kvitansiyalarni import qiladi.
+          </p>
+        </div>
+
+        <form class="relative z-10 mt-8 space-y-3" onsubmit="event.preventDefault(); runBillSearch();">
+          <div class="flex flex-col sm:flex-row gap-2.5">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-3 pointer-events-none"></i>
+              <input
+                id="inn-input"
+                inputmode="numeric"
+                maxlength="9"
+                value="302678824"
+                placeholder="STIR raqamini kiriting (9 ta raqam)"
+                class="input input-mono pl-12"
+                aria-label="Kompaniya STIR raqami"
+              />
+            </div>
+            <button type="submit" class="btn btn-primary" id="search-btn">
+              <i data-lucide="search" class="w-5 h-5"></i>
+              <span id="search-btn-label">To'lovlarni qidirish</span>
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 text-xs text-fg-3">
+            <span>Sinab ko'ring:</span>
+            <button type="button" class="chip" onclick="setInn('302678824')">302 678 824</button>
+            <button type="button" class="chip" onclick="setInn('305543087')">305 543 087</button>
+            <button type="button" class="chip" onclick="setInn('301201019')">301 201 019</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ===== DEFAULT STATE: bento feature cards (4) ===== -->
+      <div id="bills-default" class="bento-grid-4">
+        <div class="bento bento-hover p-5 anim-fade-up-1">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-soft border border-accent/30 mb-3">
+            <i data-lucide="receipt" class="w-5 h-5 text-accent"></i>
+          </div>
+          <p class="font-bold text-[15px] text-white tracking-tight-2">Barcha kvitansiyalarni import</p>
+          <p class="text-[13px] text-fg-2 mt-1.5 leading-relaxed">STIR bo'yicha yaratilgan har bir to'lov billing.sud.uz saytidan olinadi.</p>
+        </div>
+        <div class="bento bento-hover p-5 anim-fade-up-2">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/25 mb-3">
+            <i data-lucide="check-check" class="w-5 h-5 text-emerald-400"></i>
+          </div>
+          <p class="font-bold text-[15px] text-white tracking-tight-2">Turi va holatini ko'rish</p>
+          <p class="text-[13px] text-fg-2 mt-1.5 leading-relaxed">Har bir to'lov davlat boji yoki pochta sifatida belgilanadi.</p>
+        </div>
+        <div class="bento bento-hover p-5 anim-fade-up-3">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/25 mb-3">
+            <i data-lucide="folder-open" class="w-5 h-5 text-indigo-400"></i>
+          </div>
+          <p class="font-bold text-[15px] text-white tracking-tight-2">Sud ish raqamlari</p>
+          <p class="text-[13px] text-fg-2 mt-1.5 leading-relaxed">Har bir kvitansiya uchun uni ishlatgan sud hamda ish raqami ko'rsatiladi.</p>
+        </div>
+        <div class="bento bento-hover p-5 anim-fade-up-4">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/10 border border-violet-500/25 mb-3">
+            <i data-lucide="shield-check" class="w-5 h-5 text-violet-400"></i>
+          </div>
+          <p class="font-bold text-[15px] text-white tracking-tight-2">Maxfiy tarzda qidiriladi</p>
+          <p class="text-[13px] text-fg-2 mt-1.5 leading-relaxed">So'rov Tor orqali amalga oshiriladi — qidiruvni qurilmangizga bog'lab bo'lmaydi.</p>
+        </div>
+      </div>
+
+      <!-- ===== LOADING STATE ===== -->
+      <div id="bills-loading" class="hidden space-y-6">
+        <div class="bento p-6 sm:p-8 border-dashed">
+          <div class="flex items-start gap-4">
+            <div class="flex justify-center py-6">
+              <div class="scan-loader"><span>Yuklanmoqda</span></div>
+            </div>
+            <div class="flex-1 min-w-0 space-y-1.5">
+              <p class="font-semibold text-white text-[15px]" id="loading-head">STIR 302 678 824 qidirilmoqda…</p>
+              <p class="text-[13px] text-fg-2" id="loading-detail">billing.sud.uz saytida Yuridik shaxs bo'limi ochilmoqda.</p>
+              <p class="text-xs text-fg-3 font-mono mt-1.5"><span id="loading-elapsed">0</span>s o'tdi</p>
+            </div>
+          </div>
+
+          <!-- 4-step phase timeline -->
+          <div class="flex items-center flex-wrap gap-1 pt-4 mt-4 border-t border-white/5">
+            <span class="phase-step" data-phase="0">
+              <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i>
+              Ulanmoqda
+            </span>
+            <div class="phase-line"></div>
+            <span class="phase-step" data-phase="1">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+              Kirish tekshirilmoqda
+            </span>
+            <div class="phase-line"></div>
+            <span class="phase-step" data-phase="2">
+              <i data-lucide="search" class="w-3.5 h-3.5"></i>
+              To'lovlar qidirilmoqda
+            </span>
+            <div class="phase-line"></div>
+            <span class="phase-step" data-phase="3">
+              <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+              Tafsilotlar olinmoqda
+            </span>
+          </div>
+
+          <!-- Progress bar (hidden until bills stream) -->
+          <div id="loading-progress-wrap" class="hidden pt-4 mt-4 border-t border-white/5 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-fg-3 font-mono"><span id="loaded-count">0</span> / <span id="total-count">0</span> ta to'lov yuklandi</span>
+              <span class="text-fg-3 font-mono"><span id="progress-pct">0</span>%</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skeleton bento cards -->
+        <div class="bento-grid-6">
+          <div class="skel skel-card shimmer h-24"></div>
+          <div class="skel skel-card shimmer h-24"></div>
+          <div class="skel skel-card shimmer h-24"></div>
+          <div class="skel skel-card shimmer h-24"></div>
+          <div class="skel skel-card shimmer h-24"></div>
+          <div class="skel skel-card shimmer h-24"></div>
+        </div>
+        <div class="skel skel-card shimmer h-48"></div>
+      </div>
+
+      <!-- ===== RESULTS STATE ===== -->
+      <div id="bills-results" class="hidden space-y-6">
+
+        <!-- INN bar -->
+        <div class="bento p-4 flex flex-wrap items-center justify-between gap-3 anim-fade-up">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 shrink-0">
+              <i data-lucide="building-2" class="w-5 h-5 text-accent"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Kompaniya STIR raqami</p>
+              <p class="font-mono font-bold text-white text-[15px] tracking-wide flex items-center gap-2 truncate">
+                <span id="result-inn">302 678 824</span>
+                <button class="btn-icon" onclick="copyText('302678824', this)" aria-label="Nusxalash">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                </button>
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 text-sm">
+            <div>
+              <span class="text-fg-3">Jami: </span>
+              <span class="font-bold text-white" id="result-total">5</span>
+            </div>
+            <button class="btn btn-ghost" onclick="runBillSearch()">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Yangilash
+            </button>
+          </div>
+        </div>
+
+        <!-- Summary section -->
+        <div class="space-y-4">
+          <h3 class="h-section">Xulosa</h3>
+          <div class="bento-grid-6" id="summary-grid"></div>
+        </div>
+
+        <!-- Sort + filter bar -->
+        <div class="bento p-4 flex flex-wrap items-center gap-3">
+          <span class="text-xs text-fg-3 font-semibold mr-1">Saralash:</span>
+          <div class="select-wrap">
+            <select id="sort-select">
+              <option value="newest">Avval yangi</option>
+              <option value="oldest">Avval eski</option>
+            </select>
+          </div>
+
+          <div class="divider-vert hidden sm:block"></div>
+
+          <div class="flex flex-wrap items-center gap-1.5" id="filter-chips">
+            <button class="chip" data-filter="paid"><span class="dot"></span>To'langan</button>
+            <button class="chip" data-filter="unpaid"><span class="dot"></span>To'lanmagan</button>
+            <button class="chip" data-filter="davlat_boji"><span class="dot"></span>Davlat boji</button>
+            <button class="chip" data-filter="pochta"><span class="dot"></span>Pochta</button>
+          </div>
+
+          <div class="ml-auto flex items-center gap-2">
+            <div class="select-wrap">
+              <select id="pagesize-select">
+                <option value="5">5 / sahifa</option>
+                <option value="10" selected>10 / sahifa</option>
+                <option value="20">20 / sahifa</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bills list -->
+        <div id="bills-list" class="space-y-4"></div>
+
+        <!-- Pagination -->
+        <div id="bills-pagination" class="flex items-center justify-center gap-2"></div>
+      </div>
+
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- ====================== CASES TAB ========================== -->
+    <!-- ============================================================ -->
+    <section class="tab-panel" data-panel="cases" role="tabpanel">
+
+      <!-- ===== SEARCH HERO ===== -->
+      <section class="bento-strong p-8 sm:p-10 mb-8">
+        <div class="relative z-10 space-y-5 max-w-2xl">
+          <p class="h-eyebrow">O'zbekiston · my.sud.uz</p>
+          <h2 class="h-display">
+            Sud ishlarini<br>qidiring
+          </h2>
+          <p class="text-fg-2 text-sm sm:text-base leading-relaxed">
+            Iqtisodiy, fuqarolik, jinoyat va ma'muriy sudlar portalida ishlarni qidiring.
+            Kompaniya STIR, jismoniy shaxs PINFL yoki ish raqami bo'yicha — har bir
+            instansiya uchun sud majlislari, qarorlar va hujjatlarni ko'ring.
+          </p>
+        </div>
+
+        <form class="relative z-10 mt-8 space-y-3" onsubmit="event.preventDefault(); runCaseSearch();">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-1.5">
+              <label class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold flex items-center gap-1.5">
+                <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                Sud turi
+              </label>
+              <div class="select-wrap">
+                <select id="court-type-select" onchange="onCourtTypeChange()">
+                  <option value="economic" selected>Iqtisodiy sudlar</option>
+                  <option value="civil">Fuqarolik sudlari</option>
+                  <option value="criminal">Jinoyat sudlari</option>
+                  <option value="administrative">Ma'muriy sudlar</option>
+                </select>
+              </div>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold flex items-center gap-1.5">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                Qidiruv usuli
+              </label>
+              <div class="select-wrap">
+                <select id="case-mode-select">
+                  <option value="tin" selected>STIR bo'yicha</option>
+                  <option value="caseNumber">Ish raqami bo'yicha</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2.5">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-3 pointer-events-none"></i>
+              <input
+                id="case-value-input"
+                inputmode="numeric"
+                maxlength="14"
+                value="302678824"
+                placeholder="9 xonali STIR raqamini kiriting"
+                class="input input-mono pl-12"
+              />
+            </div>
+            <button type="submit" class="btn btn-primary">
+              <i data-lucide="search" class="w-5 h-5"></i>
+              Ishlarni qidirish
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ===== DEFAULT STATE: bento feature cards ===== -->
+      <div id="cases-default" class="bento-grid-4">
+        <div class="bento bento-hover p-5 anim-fade-up-1">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/25 mb-3">
+            <i data-lucide="folder-open" class="w-5 h-5 text-indigo-400"></i>
+          </div>
+          <p class="font-bold text-[15px] text-white tracking-tight-2">STIR / PINFL bo'yicha</p>
+          <p class="text-[13px] text-fg-2 mt-1.5 leading-relaxed">Iqtisodiy va fuqarolik sudlarida kompaniya yoki jismoniy shaxs bilan bog'liq barcha ishlar.</p>
+        </div>
+        <div class="bento bento-hover p-5 anim-fade-up-2">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-soft border border-accent/30 mb-3">
+            <i data-lucide="search" class="w-5 h-5 text-accent"></i>
+          </div>
+          <p class="font-bold text-[15px] text-white tracking-tight-2">Ish raqami bo'yicha</p>
+          <p class="text-[13px] text-fg-2 mt-1.5 leading-relaxed">Muayyan ishni raqami bo'yicha qidirib (masalan, 4-1001-2603/42003), to'liq tafsilotlarni ko'ring.</p>
+        </div>
+        <div class="bento bento-hover p-5 anim-fade-up-3">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-500/10 border border-sky-500/25 mb-3">
+            <i data-lucide="calendar-days" class="w-5 h-5 text-sky-400"></i>
+          </div>
+          <p class="font-bold text-[15px] text-white tracking-tight-2">Sud majlislari jadvali</p>
+          <p class="text-[13px] text-fg-2 mt-1.5 leading-relaxed">Belgilangan, kechiktirilgan va o'tkazilgan majlislarni har bir instansiya uchun ko'ring.</p>
+        </div>
+        <div class="bento bento-hover p-5 anim-fade-up-4">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/25 mb-3">
+            <i data-lucide="file-text" class="w-5 h-5 text-emerald-400"></i>
+          </div>
+          <p class="font-bold text-[15px] text-white tracking-tight-2">Qarorlar va hujjatlar</p>
+          <p class="text-[13px] text-fg-2 mt-1.5 leading-relaxed">Qaror matni, undirilgan summa, davlat boji va ish hujjatlarini yuklab oling.</p>
+        </div>
+      </div>
+
+      <!-- ===== LOADING STATE ===== -->
+      <div id="cases-loading" class="hidden space-y-6">
+        <div class="bento p-6 sm:p-8 border-dashed">
+          <div class="flex items-start gap-4">
+            <div class="flex justify-center py-6">
+              <div class="scan-loader"><span>Yuklanmoqda</span></div>
+            </div>
+            <div class="flex-1 min-w-0 space-y-1.5">
+              <p class="font-semibold text-white text-[15px]">"302 678 824" bo'yicha sud ishlari qidirilmoqda…</p>
+              <p class="text-[13px] text-fg-2">my.sud.uz ochilmoqda, captcha yechilmoqda va ishlarni kuzatish portalidan so'rov yuborilmoqda.</p>
+              <p class="text-xs text-fg-3 font-mono mt-1.5"><span id="case-loading-elapsed">0</span>s o'tdi</p>
+            </div>
+          </div>
+          <div class="flex items-center flex-wrap gap-1 pt-4 mt-4 border-t border-white/5">
+            <span class="phase-step is-current">
+              <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i>
+              Ulanmoqda
+            </span>
+            <div class="phase-line"></div>
+            <span class="phase-step">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+              Kirish tekshirilmoqda
+            </span>
+            <div class="phase-line"></div>
+            <span class="phase-step">
+              <i data-lucide="search" class="w-3.5 h-3.5"></i>
+              Ishlar qidirilmoqda
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== RESULTS STATE ===== -->
+      <div id="cases-results" class="hidden space-y-6">
+        <div class="bento p-4 flex flex-wrap items-center justify-between gap-3 anim-fade-up">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10">
+              <i data-lucide="folder-open" class="w-5 h-5 text-accent"></i>
+            </div>
+            <div>
+              <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Topilgan ishlar</p>
+              <p class="font-bold text-white text-[15px]"><span id="cases-found">2</span> ta sud ishi</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="select-wrap">
+              <select id="case-sort-select">
+                <option value="newest">Avval yangi</option>
+                <option value="oldest">Avval eski</option>
+                <option value="type">Ish turi bo'yicha</option>
+                <option value="status">Holati bo'yicha</option>
+              </select>
+            </div>
+            <div class="select-wrap">
+              <select id="case-status-filter">
+                <option value="">Barcha holatlar</option>
+                <option value="Иш юритувда">Ish yurituvda</option>
+                <option value="Тугатилган">Tugatilgan</option>
+                <option value="Кўриб чиқилмоқда">Ko'rib chiqilmoqda</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div id="cases-list" class="space-y-4"></div>
+      </div>
+
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- ====================== HEARINGS TAB ======================= -->
+    <!-- ============================================================ -->
+    <section class="tab-panel" data-panel="hearings" role="tabpanel">
+
+      <!-- ===== SEARCH HERO ===== -->
+      <section class="bento-strong p-8 sm:p-10 mb-8">
+        <div class="relative z-10 space-y-5 max-w-2xl">
+          <p class="h-eyebrow">O'zbekiston · my.sud.uz</p>
+          <h2 class="h-display">
+            Rejalashtirilgan<br>sud majlislari
+          </h2>
+          <p class="text-fg-2 text-sm sm:text-base leading-relaxed">
+            Kompaniyalaringizni saqlang va ularning barcha 4 ta sud turi (iqtisodiy,
+            fuqarolik, jinoyat, ma'muriy) bo'yicha rejalashtirilgan sud majlislarini
+            kuzating. Sudya, sud, sana, vaqt va tomonlarni ko'rsatadi.
+          </p>
+        </div>
+
+        <form class="relative z-10 mt-8 space-y-3" onsubmit="event.preventDefault(); addSavedCompany();">
+          <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr_auto] gap-2.5">
+            <input
+              id="add-tin-input"
+              inputmode="numeric"
+              maxlength="9"
+              placeholder="STIR (9 raqam)"
+              class="input input-mono"
+            />
+            <input
+              id="add-name-input"
+              placeholder="Kompaniya nomi (ixtiyoriy)"
+              class="input"
+            />
+            <button type="submit" class="btn btn-primary">
+              <i data-lucide="building-2" class="w-5 h-5"></i>
+              <span>Saqlash</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ===== SAVED COMPANIES ===== -->
+      <div class="space-y-3 mb-6">
+        <p class="h-section flex items-center gap-1.5">
+          <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+          Saqlangan kompaniyalar (<span id="saved-count">2</span>)
+        </p>
+        <div class="bento-grid-4" id="saved-companies-list"></div>
+      </div>
+
+      <!-- ===== RESULTS / LOADING / EMPTY ===== -->
+      <div id="hearings-loading" class="hidden">
+        <div class="bento p-6 sm:p-8 border-dashed">
+          <div class="flex items-start gap-4">
+            <div class="flex justify-center py-6">
+              <div class="scan-loader"><span>Yuklanmoqda</span></div>
+            </div>
+            <div class="flex-1 min-w-0 space-y-1.5">
+              <p class="font-semibold text-white text-[15px]">STIR <span id="hearings-loading-tin">302 678 824</span> uchun 4 ta sud turi qidirilmoqda…</p>
+              <p class="text-[13px] text-fg-2">Rejalashtirilgan sud majlislari uchun iqtisodiy, fuqarolik, jinoyat va ma'muriy sudlardan so'rov yuborilmoqda.</p>
+              <p class="text-xs text-fg-3 font-mono mt-1.5"><span id="hearings-elapsed">0</span>s o'tdi</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="hearings-results" class="hidden space-y-6">
+        <div class="bento p-4 flex flex-wrap items-center justify-between gap-3 anim-fade-up">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10">
+              <i data-lucide="calendar-days" class="w-5 h-5 text-accent"></i>
+            </div>
+            <div>
+              <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Rejalashtirilgan sud majlislari</p>
+              <p class="font-mono font-bold text-white text-[15px]"><span id="hearings-tin">302 678 824</span> · <span id="hearings-count">2</span> ta majlis</p>
+            </div>
+          </div>
+          <button class="btn btn-ghost" onclick="fetchHearings(currentSelectedTin)">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            Yangilash
+          </button>
+        </div>
+
+        <div id="hearings-list" class="space-y-4"></div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ====================== FOOTER ====================== -->
+  <footer class="mt-auto border-t border-white/5 mt-16">
+    <div class="wrap py-5 flex flex-col sm:flex-row items-center justify-center gap-2 text-xs text-fg-3">
+      <span>Open Design redesign preview · v68-bg-loader-glass</span>
+      <span class="hidden sm:inline">·</span>
+      <span>Belgilar: <a href="https://lucide.dev" target="_blank" rel="noopener noreferrer" class="underline hover:text-white transition-colors">Lucide</a></span>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+/* ============================================================
+   DATA — realistic Uzbek billing/court data
+   ============================================================ */
+
+const SAMPLE_BILLS = [
+  {
+    number: '261753146413',
+    invoiceStatus: 'PAID',
+    payer: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    courtType: 'ECONOMIC',
+    payCategory: 'Государственная пошлина',
+    description: 'Давлат божи',
+    amount: 170286400,
+    paidAmount: 170286400,
+    mustPayAmount: 0,
+    balance: 0,
+    spentAmount: 170286400,
+    court: 'Тошкент туманлараро иқтисодий суди',
+    instance: 'first',
+    issued: 1698364800000,
+    overdue: 1730764800000,
+    purpose: 'Даъво аризаси кўриб чиқиш учун давлат божи',
+    claimCaseNumber: '4-1001-2603/42003',
+    historyList: [
+      { caseNumber: '4-1001-2603/42003', amount: 170286400, rolledBackAt: null },
+    ],
+  },
+  {
+    number: '261742058917',
+    invoiceStatus: 'CREATED',
+    payer: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    courtType: 'ECONOMIC',
+    payCategory: 'Почтовые расходы',
+    description: 'Pochta yig\'imi',
+    amount: 5600000,
+    paidAmount: 0,
+    mustPayAmount: 5600000,
+    balance: 5600000,
+    spentAmount: 0,
+    court: 'Тошкент туманлараро иқтисодий суди',
+    instance: 'first',
+    issued: 1701475200000,
+    overdue: 1704067200000,
+    purpose: 'Sud hujjatlarini pochta orqali yetkazib berish uchun to\'lov',
+    claimCaseNumber: null,
+    historyList: [],
+  },
+  {
+    number: '261728904412',
+    invoiceStatus: 'PARTIALLY_PAID',
+    payer: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    courtType: 'ECONOMIC',
+    payCategory: 'Государственная пошлина',
+    description: 'Давлат божи',
+    amount: 12400000,
+    paidAmount: 6200000,
+    mustPayAmount: 6200000,
+    balance: 6200000,
+    spentAmount: 0,
+    court: 'Самарқанд вилоят иқтисодий суди',
+    instance: 'appellate',
+    issued: 1700611200000,
+    overdue: 1706745600000,
+    purpose: 'Апелляция шикояти кўриб чиқиш учун давлат божи',
+    claimCaseNumber: '11-1001-2603/42017',
+    historyList: [],
+  },
+  {
+    number: '261715639082',
+    invoiceStatus: 'PAID',
+    payer: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    courtType: 'ECONOMIC',
+    payCategory: 'Государственная пошлина',
+    description: 'Давлат божи',
+    amount: 450000000,
+    paidAmount: 450000000,
+    mustPayAmount: 0,
+    balance: 0,
+    spentAmount: 450000000,
+    court: 'Тошкент шаҳар иқтисодий суди',
+    instance: 'first',
+    issued: 1697760000000,
+    overdue: 1730246400000,
+    purpose: 'Иқтисодий низо бўйича даъво аризаси давлат божи',
+    claimCaseNumber: '4-1001-2602/41088',
+    historyList: [
+      { caseNumber: '4-1001-2602/41088', amount: 450000000, rolledBackAt: null },
+    ],
+  },
+  {
+    number: '261704582341',
+    invoiceStatus: 'CANCELLED',
+    payer: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    courtType: 'ECONOMIC',
+    payCategory: 'Государственная пошлина',
+    description: 'Давлат божи',
+    amount: 8900000,
+    paidAmount: 0,
+    mustPayAmount: 0,
+    balance: 0,
+    spentAmount: 0,
+    court: 'Тошкент туманлараро иқтисодий суди',
+    instance: 'first',
+    issued: 1696377600000,
+    overdue: 1698969600000,
+    purpose: 'Бекор қилинган тўлов (ариза қайтариш учун)',
+    claimCaseNumber: null,
+    historyList: [],
+  },
+];
+
+const SAMPLE_CASES = [
+  {
+    caseNumber: '4-1001-2603/42003',
+    caseType: 'Иқтисодий низо',
+    caseStatus: 'Иш юритувда',
+    courtName: 'Тошкент туманлараро иқтисодий суди',
+    dateFiled: '27.10.2023',
+    plaintiff: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    defendant: '"TRANS LOGISTICS" MChJ',
+    result: '—',
+    judge: 'АЛИМАРДАНОВ САРДОР ТЎЛҚИНОВИЧ',
+    secretary: 'КАРИМОВА ДИЛНОРА РАХМАТОВНА',
+    claimSubject: '4 528 640 000 so\'m',
+    detail: {
+      general: {
+        court: 'Тошкент туманлараро иқтисодий суди',
+        caseNumber: '4-1001-2603/42003',
+        caseType: 'Иқтисодий низо',
+        caseStatus: 'Иш юритувда',
+        judge: 'АЛИМАРДАНОВ САРДОР ТЎЛҚИНОВИЧ',
+        secretary: 'КАРИМОВА ДИЛНОРА РАХМАТОВНА',
+        plaintiff: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+        defendant: '"TRANS LOGISTICS" MChJ',
+        claimSubject: '4 528 640 000 so\'m',
+      },
+      instances: [
+        {
+          title: 'Биринчи инстанция',
+          hearings: [
+            { date: '15.11.2023', time: '10:00', status: 'Тайинланган', courtroom: '№ 4 зал', judge: 'АЛИМАРДАНОВ САРДОР ТЎЛҚИНОВИЧ' },
+            { date: '29.11.2023', time: '11:30', status: 'Кечиктирилган', courtroom: '№ 4 зал', judge: 'АЛИМАРДАНОВ САРДОР ТЎЛҚИНОВИЧ', postponementReason: 'Жавобгар талабига биноан кўриб чиқиш муддати узайтирилди' },
+          ],
+          decision: null,
+          documents: [
+            { name: 'Даъво аризаси.pdf', date: '27.10.2023' },
+            { name: 'Тўлов квитансияси.pdf', date: '27.10.2023' },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    caseNumber: '11-1001-2603/42017',
+    caseType: 'Апелляция шикояти',
+    caseStatus: 'Тугатилган',
+    courtName: 'Самарқанд вилоят иқтисодий суди',
+    dateFiled: '03.08.2023',
+    plaintiff: '"TRANS LOGISTICS" MChJ',
+    defendant: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    result: 'Шикоят таъсис этilmagan',
+    judge: 'РАҲИМОВ БЕҲРУЗ ҚАҲРАМОНОВИЧ',
+    secretary: '—',
+    claimSubject: '12 400 000 so\'m',
+    detail: {
+      general: {
+        court: 'Самарқанд вилоят иқтисодий суди',
+        caseNumber: '11-1001-2603/42017',
+        caseType: 'Апелляция шикояти',
+        caseStatus: 'Тугатилган',
+        judge: 'РАҲИМОВ БЕҲРУЗ ҚАҲРАМОНОВИЧ',
+        secretary: '—',
+        plaintiff: '"TRANS LOGISTICS" MChJ',
+        defendant: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+        claimSubject: '12 400 000 so\'m',
+      },
+      instances: [
+        {
+          title: 'Апелляция инстанцияси',
+          hearings: [
+            { date: '18.09.2023', time: '14:00', status: 'Ўтказилган', courtroom: '№ 2 зал', judge: 'РАҲИМОВ БЕҲРУЗ ҚАҲРАМОНОВИЧ' },
+          ],
+          decision: {
+            date: '18.09.2023',
+            type: 'Қарор',
+            text: 'Апелляция шикояти таъсис этilmagan. Биринчи инстанция ҳукми ўзгартирилсиз қолдирилди.',
+            awardedAmount: '12 400 000 so\'m',
+            stateDutyRecovered: '620 000 so\'m',
+            enforcedDate: '02.10.2023',
+            appealDeadline: '—',
+          },
+          documents: [
+            { name: 'Апелляция шикояти.pdf', date: '03.08.2023' },
+            { name: 'Қарор.pdf', date: '18.09.2023' },
+          ],
+        },
+      ],
+    },
+  },
+];
+
+const SAMPLE_HEARINGS = [
+  {
+    caseNumber: '4-1001-2603/42003',
+    caseType: 'Иқтисодий низо',
+    caseStatus: 'Иш юритувда',
+    courtName: 'Тошкент туманлараро иқтисодий суди',
+    hearingDate: '15.11.2023',
+    hearingTime: '10:00',
+    judge: 'АЛИМАРДАНОВ САРДОР ТЎЛҚИНОВИЧ',
+    courtType: 'economic',
+    courtTypeLabel: 'Iqtisodiy sud',
+    plaintiff: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    defendant: '"TRANS LOGISTICS" MChJ',
+  },
+  {
+    caseNumber: '4-1001-2602/41088',
+    caseType: 'Иқтисодий низо',
+    caseStatus: 'Кўриб чиқилмоқда',
+    courtName: 'Тошкент шаҳар иқтисодий суди',
+    hearingDate: '22.11.2023',
+    hearingTime: '12:00',
+    judge: 'ЮЛДАШЕВ РУСТАМ ЖОМОВИЧ',
+    courtType: 'economic',
+    courtTypeLabel: 'Iqtisodiy sud',
+    plaintiff: '"O’ZBEKISTON TEMIR YO’LLARI" AJ',
+    defendant: '"GLOBAL TRADE" MChJ',
+  },
+];
+
+let savedCompanies = [
+  { tin: '302678824', name: '"O’ZBEKISTON TEMIR YO’LLARI" AJ', savedAt: Date.now() - 86400000 },
+  { tin: '305543087', name: '"UZAUTO MOTORS" AJ', savedAt: Date.now() - 43200000 },
+];
+let currentSelectedTin = null;
+
+/* ============================================================
+   LUCIDE ICON HELPER
+   Maps Icons8-style slugs to Lucide icon names.
+   Returns a `<i data-lucide="...">` element that lucide.createIcons()
+   later replaces with inline SVG.
+   ============================================================ */
+const LUCIDE_MAP = {
+  'billing':     'receipt',
+  'check-all':   'check-check',
+  'clock':       'clock',
+  'money-box':   'wallet',
+  'exchange':    'arrow-left-right',
+  'company':     'building-2',
+  'calendar':    'calendar-days',
+  'certificate': 'award',
+  'scroll':      'file-text',
+  'layers':      'folder-open',
+  'briefcase':   'gavel',
+  'shield':      'shield-check',
+  'user':        'users',
+  'users':       'users',
+  'info':        'info',
+  'trash':       'trash-2',
+  'external':    'external-link',
+  'link':        'link',
+  'lock':        'lock',
+  'alert':       'alert-circle',
+  'chevron-down': 'chevron-down',
+  'chevron-left': 'chevron-left',
+  'chevron-right': 'chevron-right',
+  'copy':        'copy',
+  'refresh':     'refresh-cw',
+  'menu':        'layout-grid',
+  'search':      'search',
+};
+function gi(slug, size = 16, cls = '') {
+  const name = LUCIDE_MAP[slug] || slug;
+  return `<i data-lucide="${name}" style="width:${size}px;height:${size}px;" class="${cls}"></i>`;
+}
+
+/* Refresh Lucide icons in the DOM (call after every DOM update). */
+function refreshIcons(){
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function formatSum(tiyins) {
+  const sum = (tiyins || 0) / 100;
+  return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(sum);
+}
+function formatTin(tin) {
+  return (tin || '').replace(/(\d{3})(?=\d)/g, '$1 ');
+}
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function instanceLabel(s) {
+  if (!s) return '';
+  if (s.toLowerCase() === 'first') return 'birinchi instansiya';
+  if (s.toLowerCase() === 'appellate') return 'apellyatsiya';
+  if (s.toLowerCase() === 'cassation') return 'kassatsiya';
+  return s.toLowerCase() + ' instansiya';
+}
+
+const STATUS_META = {
+  CREATED:         { label: "To'lanmagan",            cls: 'b-unpaid' },
+  PARTIALLY_PAID:  { label: "Qisman to'langan",       cls: 'b-partial' },
+  PAID:            { label: "To'liq to'langan",       cls: 'b-paid' },
+  CHECKING:        { label: 'Tasdiqlanmoqda',         cls: 'b-checking' },
+  CANCELLED:       { label: 'Bekor qilingan',         cls: 'b-cancelled' },
+  USED:            { label: 'Ishlatilgan',            cls: 'b-used' },
+  SENT_TO_MIB:     { label: 'BPIga yuborilgan',       cls: 'b-mib' },
+};
+
+function statusBadge(status) {
+  const m = STATUS_META[status] || { label: status || "Noma'lum", cls: 'b-neutral' };
+  return `<span class="badge ${m.cls}">${m.label}</span>`;
+}
+
+const COURT_TYPE_BADGES = {
+  ECONOMIC:       { label: 'Iqtisodiy sud',  cls: 'b-court-econ' },
+  CITIZEN:        { label: 'Fuqarolik sudi', cls: 'b-court-civ' },
+  CRIMINAL:       { label: 'Jinoyat sudi',   cls: 'b-court-crim' },
+  ADMINISTRATIVE: { label: "Ma'muriy sud",   cls: 'b-court-adm' },
+};
+function courtTypeBadge(type) {
+  if (!type) return '';
+  const m = COURT_TYPE_BADGES[type] || { label: type, cls: 'b-neutral' };
+  return `<span class="badge ${m.cls}">${m.label}</span>`;
+}
+
+function categoryMeta(payCategory, description) {
+  const text = `${payCategory || ''} ${description || ''}`.toLowerCase();
+  if (text.includes('pochta') || text.includes('почта')) {
+    return { label: 'Pochta', cls: 'b-checking' };
+  }
+  if (text.includes('boj') || text.includes('boji') || text.includes('бож') || text.includes('пошлин')) {
+    return { label: 'Davlat boji', cls: 'b-accent' };
+  }
+  return { label: payCategory || description || '—', cls: 'b-neutral' };
+}
+function categoryBadge(payCategory, description) {
+  const m = categoryMeta(payCategory, description);
+  return `<span class="badge ${m.cls}">${m.label}</span>`;
+}
+
+const CASE_STATUS_LABELS = {
+  'Иш юритувда':       { label: 'Ish yurituvda',       cls: 'b-accent' },
+  'Кўриб чиқилмоқда':  { label: "Ko'rib chiqilmoqda",  cls: 'b-checking' },
+  'Тугатилган':         { label: 'Tugatilgan',           cls: 'b-paid' },
+  'Тўхтатилган':        { label: "To'xtatilgan",         cls: 'b-unpaid' },
+  'Бекор қилинган':     { label: 'Bekor qilingan',       cls: 'b-cancelled' },
+  'Апелляцияда':        { label: 'Apellyatsiyada',       cls: 'b-mib' },
+};
+function caseStatusBadge(status) {
+  const m = CASE_STATUS_LABELS[status] || { label: status || "Noma'lum", cls: 'b-neutral' };
+  return `<span class="badge ${m.cls}">${m.label}</span>`;
+}
+
+const HEARING_STATUS_LABELS = {
+  'Тайинланган':     { label: 'Tayinlangan',     cls: 'b-accent' },
+  'Кечиктирилган':   { label: 'Kechiktirilgan', cls: 'b-unpaid' },
+  'Ўтказилган':      { label: "O'tkazilgan",     cls: 'b-paid' },
+  'Бекор қилинган':  { label: 'Bekor qilingan',  cls: 'b-cancelled' },
+  'Якунланган':      { label: 'Yakunlangan',     cls: 'b-used' },
+};
+function hearingStatusBadge(status) {
+  const m = HEARING_STATUS_LABELS[status] || { label: status || "Noma'lum", cls: 'b-neutral' };
+  return `<span class="badge ${m.cls}">${m.label}</span>`;
+}
+
+/* ============================================================
+   TAB SWITCHING — instant panel swap + staggered child fade-up
+   No wipe overlay, no setTimeouts, no lock. The pill slides
+   smoothly to the new position (CSS transition on .tab-pill),
+   the outgoing panel is hidden at once, and the incoming panel
+   is shown immediately with a fast fade-in. Its `.anim-fade-up-*`
+   children replay their staggered fade-up animation so the swap
+   feels both instant and polished (~0.3s perceived).
+   ============================================================ */
+let currentTab = 'bills';
+
+function positionTabPill(name) {
+  const pill = document.getElementById('tab-pill');
+  const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+  const bar = document.getElementById('tabs-bar');
+  if (!pill || !btn || !bar) return;
+  const barRect = bar.getBoundingClientRect();
+  const btnRect = btn.getBoundingClientRect();
+  const left = btnRect.left - barRect.left;
+  const width = btnRect.width;
+  pill.style.width = width + 'px';
+  pill.style.transform = `translateX(${left - 5}px)`;
+}
+
+function switchTab(name) {
+  if (name === currentTab) return;
+  currentTab = name;
+
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const active = btn.dataset.tab === name;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  positionTabPill(name);
+
+  // Instant panel swap
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.remove('is-active');
+    if (p.dataset.panel !== name) p.style.display = 'none';
+  });
+  const incoming = document.querySelector(`.tab-panel[data-panel="${name}"]`);
+  if (incoming) {
+    incoming.style.display = '';
+    // Force reflow then add is-active for staggered animation
+    void incoming.offsetWidth;
+    incoming.classList.add('is-active');
+    // Re-trigger staggered animations on children
+    incoming.querySelectorAll('.anim-fade-up, [class*="anim-fade-up-"]').forEach(el => {
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.animation = '';
+    });
+    refreshIcons();
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+/* ============================================================
+   BILLS — search, summary, render, filter, pagination
+   ============================================================ */
+let billsState = {
+  all: [],
+  filtered: [],
+  sortBy: 'newest',
+  filters: new Set(),
+  page: 0,
+  pageSize: 10,
+  loading: false,
+  elapsed: 0,
+  timer: null,
+};
+
+function setInn(value) {
+  document.getElementById('inn-input').value = value;
+}
+
+function runBillSearch() {
+  const inn = document.getElementById('inn-input').value.replace(/\D/g, '');
+  if (inn.length !== 9) return;
+
+  // Show loading state
+  document.getElementById('bills-default').classList.add('hidden');
+  document.getElementById('bills-results').classList.add('hidden');
+  document.getElementById('bills-loading').classList.remove('hidden');
+
+  const loadingHead = document.getElementById('loading-head');
+  loadingHead.textContent = `STIR ${formatTin(inn)} qidirilmoqda…`;
+
+  // Reset phase steps
+  const phases = document.querySelectorAll('#bills-loading .phase-step');
+  phases.forEach((p, i) => {
+    p.classList.remove('is-current', 'is-done');
+  });
+  document.querySelectorAll('#bills-loading .phase-line').forEach(l => l.classList.remove('is-done'));
+
+  document.getElementById('loading-progress-wrap').classList.add('hidden');
+  document.getElementById('loading-head').textContent = `STIR ${formatTin(inn)} qidirilmoqda…`;
+  document.getElementById('loading-detail').textContent = "billing.sud.uz saytida Yuridik shaxs bo'limi ochilmoqda.";
+
+  // Update search button
+  const btn = document.getElementById('search-btn');
+  const btnLabel = document.getElementById('search-btn-label');
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner" style="border-color: rgba(255,255,255,0.3); border-top-color: #fff;"></div><span>Qidirilmoqda…</span>`;
+
+  billsState.elapsed = 0;
+  document.getElementById('loading-elapsed').textContent = '0';
+  if (billsState.timer) clearInterval(billsState.timer);
+  billsState.timer = setInterval(() => {
+    billsState.elapsed++;
+    document.getElementById('loading-elapsed').textContent = billsState.elapsed;
+  }, 1000);
+
+  // Simulate phase progression
+  setTimeout(() => { setPhase(0); }, 200);
+  setTimeout(() => {
+    setPhase(1);
+    document.getElementById('loading-detail').textContent = 'Captcha yechilmoqda (PoW + browser signals).';
+  }, 900);
+  setTimeout(() => {
+    setPhase(2);
+    document.getElementById('loading-detail').textContent = "To'lovlar ro'yxati olinmoqda…";
+  }, 1700);
+  setTimeout(() => {
+    setPhase(3);
+    document.getElementById('loading-detail').textContent = 'Har bir kvitansiya uchun batafsil holat olinmoqda.';
+    // Show progress bar
+    document.getElementById('loading-progress-wrap').classList.remove('hidden');
+    const total = SAMPLE_BILLS.length;
+    document.getElementById('total-count').textContent = total;
+    let loaded = 0;
+    document.getElementById('loaded-count').textContent = '0';
+    document.getElementById('progress-pct').textContent = '0';
+    document.getElementById('progress-fill').style.width = '0%';
+
+    const loadInterval = setInterval(() => {
+      loaded++;
+      document.getElementById('loaded-count').textContent = loaded;
+      const pct = Math.round((loaded / total) * 100);
+      document.getElementById('progress-pct').textContent = pct;
+      document.getElementById('progress-fill').style.width = pct + '%';
+      if (loaded >= total) {
+        clearInterval(loadInterval);
+        setTimeout(finishBillSearch, 400);
+      }
+    }, 500);
+  }, 2400);
+}
+
+function setPhase(idx) {
+  const phases = document.querySelectorAll('#bills-loading .phase-step');
+  const lines = document.querySelectorAll('#bills-loading .phase-line');
+  phases.forEach((p, i) => {
+    p.classList.remove('is-current', 'is-done');
+    if (i < idx) p.classList.add('is-done');
+    if (i === idx) p.classList.add('is-current');
+  });
+  lines.forEach((l, i) => {
+    l.classList.toggle('is-done', i < idx);
+  });
+}
+
+function finishBillSearch() {
+  clearInterval(billsState.timer);
+  // Reset search button
+  const btn = document.getElementById('search-btn');
+  btn.disabled = false;
+  btn.innerHTML = `<i data-lucide="search" class="w-5 h-5"></i><span id="search-btn-label">To'lovlarni qidirish</span>`;
+  refreshIcons();
+
+  billsState.all = [...SAMPLE_BILLS];
+  billsState.page = 0;
+  billsState.filters = new Set();
+  billsState.sortBy = 'newest';
+  document.getElementById('sort-select').value = 'newest';
+  document.querySelectorAll('#filter-chips .chip').forEach(c => c.classList.remove('is-active'));
+
+  document.getElementById('bills-loading').classList.add('hidden');
+  document.getElementById('bills-results').classList.remove('hidden');
+
+  document.getElementById('result-inn').textContent = formatTin(document.getElementById('inn-input').value);
+  document.getElementById('result-total').textContent = billsState.all.length;
+
+  renderSummary();
+  applyBillFilters();
+}
+
+/* ============================================================
+   SUMMARY — count-up animation
+   Numbers animate from 0 to final value over 0.8s.
+   Amounts use Intl.NumberFormat('ru-RU', ...) with 2 fraction digits.
+   Each card starts at a staggered delay (0.1s..0.35s).
+   ============================================================ */
+function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+function animateCountUp(el, target, opts) {
+  opts = opts || {};
+  const duration = opts.duration || 800;
+  const delay = opts.delay || 0;
+  const isMoney = !!opts.money;
+  // Money values are stored as TIYINS; for display we divide by `divisor` (default 1).
+  // For so'm amounts divisor = 100.
+  const divisor = opts.divisor || 1;
+  const fmtMoney = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const startTime = performance.now() + delay;
+
+  // Cancel any prior animation on this element
+  if (el.__countAnim) {
+    cancelAnimationFrame(el.__countAnim);
+    el.__countAnim = null;
+  }
+
+  // Start at 0
+  el.textContent = isMoney ? fmtMoney.format(0) : '0';
+
+  function frame(now) {
+    if (now < startTime) {
+      el.__countAnim = requestAnimationFrame(frame);
+      return;
+    }
+    const t = Math.min(1, (now - startTime) / duration);
+    const eased = easeOutCubic(t);
+    const current = target * eased;
+    if (isMoney) {
+      el.textContent = fmtMoney.format(current / divisor);
+    } else {
+      el.textContent = String(Math.round(current));
+    }
+    if (t < 1) {
+      el.__countAnim = requestAnimationFrame(frame);
+    } else {
+      el.textContent = isMoney ? fmtMoney.format(target / divisor) : String(target);
+      el.__countAnim = null;
+    }
+  }
+  el.__countAnim = requestAnimationFrame(frame);
+}
+
+function renderSummary() {
+  const bills = billsState.all;
+  let paid = 0, partial = 0, unpaid = 0, other = 0;
+  let totalAmount = 0, totalPaid = 0, totalBalance = 0;
+  for (const b of bills) {
+    if (b.invoiceStatus === 'PAID' || b.invoiceStatus === 'USED') paid++;
+    else if (b.invoiceStatus === 'PARTIALLY_PAID') partial++;
+    else if (b.invoiceStatus === 'CREATED') unpaid++;
+    else other++;
+    totalAmount  += b.amount || 0;
+    totalPaid    += b.paidAmount || 0;
+    totalBalance += b.balance || 0;
+  }
+
+  // Card spec — counts animate as integers, amounts animate as money (tiyins -> so'm)
+  const cards = [
+    { label: "Jami to'lovlar", value: bills.length, slug: 'receipt',       big: true, money: false, tone: '' },
+    { label: "To'langan",      value: paid,         slug: 'check-check',   big: true, money: false, tone: 'paid' },
+    { label: "To'lanmagan",    value: unpaid + partial, slug: 'clock',     big: true, money: false, tone: 'unpaid' },
+    { label: 'Jami summa',     value: totalAmount,  slug: 'wallet',        big: false, money: true,  sub: "so'm", tone: '' },
+    { label: "Jami to'langan", value: totalPaid,    slug: 'check-check',   big: false, money: true,  sub: "so'm", tone: 'paid' },
+    { label: 'Qarzdorlik',     value: totalBalance, slug: 'clock',         big: false, money: true,  sub: "so'm", tone: 'unpaid' },
+  ];
+
+  // Note: money values are in TIYINS (cents). For display we divide by 100.
+  const grid = document.getElementById('summary-grid');
+  grid.innerHTML = cards.map((c, i) => {
+    const toneStyle = c.tone === 'paid' ? 'style="color:#34d399"' : c.tone === 'unpaid' ? 'style="color:#38bdf8"' : '';
+    return `
+      <div class="bento bento-hover p-4 anim-fade-up-${i + 1}" data-card-idx="${i}">
+        <div class="flex items-start justify-between gap-2">
+          <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold truncate min-w-0">${c.label}</p>
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 shrink-0">
+            ${gi(c.slug, 16, 'text-fg-3')}
+          </div>
+        </div>
+        <p class="font-mono font-extrabold mt-2.5 leading-tight truncate min-w-0 ${c.big ? 'text-[clamp(1.1rem,5vw,1.6rem)]' : 'text-[clamp(0.85rem,4vw,1.05rem)]'}" ${toneStyle} data-countup data-money="${c.money ? '1' : '0'}" data-target="${c.value}">
+          ${c.money ? formatSum(0) : '0'}
+        </p>
+        ${c.sub ? `<p class="text-[11px] text-fg-3 mt-0.5">${c.sub}</p>` : ''}
+      </div>
+    `;
+  }).join('');
+  refreshIcons();
+
+  // Trigger count-up animations with staggered delays (0.10s .. 0.35s)
+  const delays = [100, 150, 200, 250, 300, 350];
+  grid.querySelectorAll('[data-countup]').forEach((el, i) => {
+    const target = parseFloat(el.dataset.target) || 0;
+    const isMoney = el.dataset.money === '1';
+    // Money values are stored as TIYINS; animate tiyins but display in so'm (divisor=100).
+    animateCountUp(el, target, {
+      duration: 800,
+      delay: delays[i] || 100,
+      money: isMoney,
+      divisor: isMoney ? 100 : 1,
+    });
+  });
+}
+
+function applyBillFilters() {
+  let filtered = [...billsState.all];
+
+  if (billsState.filters.size > 0) {
+    filtered = filtered.filter(b => {
+      const st = b.invoiceStatus;
+      const cat = categoryMeta(b.payCategory, b.description);
+      if (billsState.filters.has('paid') && !(st === 'PAID' || st === 'USED')) return false;
+      if (billsState.filters.has('unpaid') && !(st === 'CREATED' || st === 'PARTIALLY_PAID' || st === 'CHECKING')) return false;
+      if (billsState.filters.has('davlat_boji') && cat.label !== 'Davlat boji') return false;
+      if (billsState.filters.has('pochta') && cat.label !== 'Pochta') return false;
+      return true;
+    });
+  }
+
+  filtered.sort((a, b) => {
+    const da = a.issued || 0, db = b.issued || 0;
+    if (billsState.sortBy === 'newest') return db - da;
+    return da - db;
+  });
+
+  billsState.filtered = filtered;
+  billsState.page = 0;
+  renderBills();
+}
+
+function renderBills() {
+  const list = document.getElementById('bills-list');
+  const { filtered, page, pageSize } = billsState;
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="bento p-10 text-center border-dashed">
+        <p class="text-fg-2">Joriy filtrlarga mos to'lov topilmadi.</p>
+      </div>
+    `;
+    document.getElementById('bills-pagination').innerHTML = '';
+    refreshIcons();
+    return;
+  }
+
+  const start = page * pageSize;
+  const paged = filtered.slice(start, start + pageSize);
+
+  list.innerHTML = paged.map((b, i) => billCardHTML(b, start + i)).join('');
+  refreshIcons();
+
+  // Wire up expand toggles
+  list.querySelectorAll('[data-expand]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.expand;
+      const target = document.getElementById(id);
+      const isExpanded = btn.dataset.expanded === 'true';
+      if (isExpanded) {
+        target.style.maxHeight = '0';
+        target.style.opacity = '0';
+        target.style.marginTop = '0';
+        btn.dataset.expanded = 'false';
+        btn.querySelector('.expand-label').textContent = "Sud tomonidan ishlatilishi";
+        btn.querySelector('.expand-icon').style.transform = 'rotate(0deg)';
+      } else {
+        target.style.maxHeight = '2000px';
+        target.style.opacity = '1';
+        target.style.marginTop = '16px';
+        btn.dataset.expanded = 'true';
+        btn.querySelector('.expand-label').textContent = "Yashirish";
+        btn.querySelector('.expand-icon').style.transform = 'rotate(180deg)';
+      }
+    });
+  });
+
+  renderBillPagination();
+}
+
+function billCardHTML(b, idx) {
+  const spentAmount = (b.historyList || []).reduce((s, h) => s + (h.amount || 0), 0);
+  const usedHistory = (b.historyList || []).filter(h => h.invoiceStatus === 'USED' || h.rolledBackAt || h.caseNumber);
+  const hasCases = usedHistory.length > 0 || b.claimCaseNumber;
+  const expandId = `bill-expand-${idx}`;
+
+  return `
+    <article class="bento bento-hover p-5 sm:p-6 anim-fade-up">
+      <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
+        <div class="space-y-1.5 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-bold text-fg-3">#${idx + 1}</span>
+            <h3 class="font-mono tabular-nums text-[15px] font-bold text-white tracking-tight-2 break-all flex items-center gap-2">
+              ${gi('receipt', 18, 'text-fg-3')}
+              ${b.number}
+            </h3>
+            <button class="btn-icon" onclick="copyText('${b.number}', this)" aria-label="Nusxalash">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          ${b.payer ? `
+            <p class="text-[13px] text-fg-2 flex items-center gap-1.5">
+              ${gi('company', 14, 'text-fg-3')}
+              ${b.payer}
+            </p>
+          ` : ''}
+        </div>
+        <div class="flex items-center gap-2 flex-wrap shrink-0">
+          ${courtTypeBadge(b.courtType)}
+          ${categoryBadge(b.payCategory, b.description)}
+          ${statusBadge(b.invoiceStatus)}
+        </div>
+      </header>
+
+      <!-- Money cells: 5 in a bento grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <div class="money-cell">
+          <div class="label">${gi('wallet', 12, 'text-fg-3')}Kvitansiya summasi</div>
+          <div class="value">${formatSum(b.amount)}</div>
+          <div class="sub">so'm</div>
+        </div>
+        <div class="money-cell is-paid">
+          <div class="label">${gi('check-check', 12, 'text-emerald-400')}To'langan</div>
+          <div class="value">${formatSum(b.paidAmount)}</div>
+          <div class="sub">so'm</div>
+        </div>
+        <div class="money-cell is-unpaid">
+          <div class="label">${gi('clock', 12, 'text-sky-400')}To'lanmagan</div>
+          <div class="value">${formatSum(b.mustPayAmount)}</div>
+          <div class="sub">so'm</div>
+        </div>
+        <div class="money-cell">
+          <div class="label">${gi('receipt', 12, 'text-fg-3')}Sarflangan</div>
+          <div class="value">${formatSum(spentAmount)}</div>
+          <div class="sub">so'm</div>
+        </div>
+        <div class="money-cell is-accent">
+          <div class="label">${gi('arrow-left-right', 12, 'text-accent')}Qoldiq</div>
+          <div class="value">${formatSum(b.balance)}</div>
+          <div class="sub">so'm</div>
+        </div>
+      </div>
+
+      <!-- Court + dates row -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-sm">
+        <div class="flex items-start gap-2.5">
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 shrink-0 mt-0.5">
+            ${gi('company', 14, 'text-fg-3')}
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Sud</p>
+            <p class="font-medium text-white text-[13.5px] break-words">${b.court || '—'}</p>
+            ${b.instance ? `<p class="text-[11px] text-fg-3 mt-0.5">${instanceLabel(b.instance)}</p>` : ''}
+          </div>
+        </div>
+        <div class="flex items-start gap-2.5">
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 shrink-0 mt-0.5">
+            ${gi('calendar', 14, 'text-fg-3')}
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Berilgan sana</p>
+            <p class="font-medium text-white text-[13.5px] font-mono tabular-nums">${formatDate(b.issued)}</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-2.5">
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 shrink-0 mt-0.5">
+            ${gi('certificate', 14, 'text-fg-3')}
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Amal qilish muddati</p>
+            <p class="font-medium text-white text-[13.5px] font-mono tabular-nums">${formatDate(b.overdue)}</p>
+          </div>
+        </div>
+      </div>
+
+      ${b.purpose || b.description ? `
+        <div class="flex items-start gap-2.5 mt-4 text-sm">
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 shrink-0 mt-0.5">
+            ${gi('scroll', 14, 'text-fg-3')}
+          </div>
+          <div class="min-w-0 space-y-0.5">
+            ${b.purpose ? `<p class="text-fg text-[13.5px] break-words"><span class="text-fg-3">Maqsad: </span>${b.purpose}</p>` : ''}
+            ${b.description ? `<p class="text-fg text-[13.5px] break-words"><span class="text-fg-3">Turi: </span>${b.description}${b.payCategory ? ` (${b.payCategory})` : ''}</p>` : ''}
+          </div>
+        </div>
+      ` : ''}
+
+      ${hasCases ? `
+        <button class="btn btn-ghost w-full sm:w-auto mt-5" data-expand="${expandId}" data-expanded="false">
+          <i data-lucide="chevron-down" class="w-4 h-4 expand-icon transition-transform"></i>
+          <span class="expand-label">Sud tomonidan ishlatilishi (${usedHistory.length})</span>
+        </button>
+        <div id="${expandId}" class="overflow-hidden transition-all" style="max-height: 0; opacity: 0; margin-top: 0;">
+          ${b.claimCaseNumber ? `
+            <div class="rounded-2xl border border-accent/20 bg-accent/5 p-3.5 text-sm flex items-center gap-2 flex-wrap" style="backdrop-filter:blur(12px) saturate(140%);-webkit-backdrop-filter:blur(12px) saturate(140%);">
+              <span class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">№ Da'vo ish raqami:</span>
+              <span class="font-mono tabular-nums font-bold text-[15px] text-accent">${b.claimCaseNumber}</span>
+              <button class="btn-icon" onclick="copyText('${b.claimCaseNumber}', this)" aria-label="Nusxalash">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          ` : ''}
+          <div class="rounded-2xl border border-white/7 overflow-hidden mt-3" style="backdrop-filter:blur(12px) saturate(140%);-webkit-backdrop-filter:blur(12px) saturate(140%);">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-white/7 bg-white/[0.02]">
+                  <th class="text-left py-2.5 px-3 text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Ish / ariza raqami</th>
+                  <th class="text-left py-2.5 px-3 text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Holati</th>
+                  <th class="text-right py-2.5 px-3 text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Summasi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${usedHistory.map(h => `
+                  <tr class="border-b border-white/5 last:border-0">
+                    <td class="py-2.5 px-3 font-mono tabular-nums text-white">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-fg-3">№</span>
+                        <span class="font-bold">${h.caseNumber || '—'}</span>
+                      </div>
+                    </td>
+                    <td class="py-2.5 px-3">
+                      ${h.rolledBackAt
+                        ? `<span class="badge b-partial">Returned</span>`
+                        : `<span class="badge b-used">Used</span>`}
+                    </td>
+                    <td class="py-2.5 px-3 text-right font-mono tabular-nums text-white">
+                      ${formatSum(h.amount)}
+                      <span class="text-fg-3 text-xs ml-1">so'm</span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+    </article>
+  `;
+}
+
+function renderBillPagination() {
+  const { filtered, page, pageSize } = billsState;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const el = document.getElementById('bills-pagination');
+  if (totalPages <= 1) {
+    el.innerHTML = `
+      <span class="text-xs text-fg-3 font-mono">${filtered.length} ta to'lov · ${totalPages} sahifa</span>
+    `;
+    return;
+  }
+
+  let html = `
+    <button class="page-btn" ${page === 0 ? 'disabled' : ''} onclick="billPage(${page - 1})">
+      <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+    </button>
+  `;
+  for (let i = 0; i < totalPages; i++) {
+    html += `<button class="page-btn ${i === page ? 'is-active' : ''}" onclick="billPage(${i})">${i + 1}</button>`;
+  }
+  html += `
+    <button class="page-btn" ${page === totalPages - 1 ? 'disabled' : ''} onclick="billPage(${page + 1})">
+      <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+    </button>
+  `;
+  el.innerHTML = html;
+  refreshIcons();
+}
+
+function billPage(p) {
+  billsState.page = p;
+  renderBills();
+  document.getElementById('bills-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.getElementById('sort-select').addEventListener('change', e => {
+  billsState.sortBy = e.target.value;
+  applyBillFilters();
+});
+document.getElementById('pagesize-select').addEventListener('change', e => {
+  billsState.pageSize = parseInt(e.target.value, 10);
+  billsState.page = 0;
+  renderBills();
+});
+document.querySelectorAll('#filter-chips .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const f = chip.dataset.filter;
+    if (billsState.filters.has(f)) {
+      billsState.filters.delete(f);
+      chip.classList.remove('is-active');
+    } else {
+      billsState.filters.add(f);
+      chip.classList.add('is-active');
+    }
+    applyBillFilters();
+  });
+});
+
+/* ============================================================
+   COURT CASES — search, render, expand detail
+   ============================================================ */
+let casesState = {
+  all: [],
+  sortBy: 'newest',
+  statusFilter: '',
+  loading: false,
+  elapsed: 0,
+  timer: null,
+};
+
+function onCourtTypeChange() {
+  const type = document.getElementById('court-type-select').value;
+  const modeSelect = document.getElementById('case-mode-select');
+  const valueInput = document.getElementById('case-value-input');
+  if (type === 'economic' || type === 'administrative') {
+    modeSelect.innerHTML = `
+      <option value="tin" selected>STIR bo'yicha</option>
+      <option value="caseNumber">Ish raqami bo'yicha</option>
+    `;
+    valueInput.placeholder = '9 xonali STIR raqamini kiriting';
+    valueInput.maxLength = 9;
+  } else {
+    modeSelect.innerHTML = `
+      <option value="pinfl" selected>PINFL bo'yicha</option>
+      <option value="caseNumber">Ish raqami bo'yicha</option>
+    `;
+    valueInput.placeholder = '14 xonali PINFL raqamini kiriting';
+    valueInput.maxLength = 14;
+  }
+  valueInput.value = '';
+}
+
+function runCaseSearch() {
+  const value = document.getElementById('case-value-input').value.trim();
+  if (!value) return;
+
+  document.getElementById('cases-default').classList.add('hidden');
+  document.getElementById('cases-results').classList.add('hidden');
+  document.getElementById('cases-loading').classList.remove('hidden');
+
+  casesState.elapsed = 0;
+  document.getElementById('case-loading-elapsed').textContent = '0';
+  if (casesState.timer) clearInterval(casesState.timer);
+  casesState.timer = setInterval(() => {
+    casesState.elapsed++;
+    document.getElementById('case-loading-elapsed').textContent = casesState.elapsed;
+  }, 1000);
+
+  setTimeout(() => {
+    clearInterval(casesState.timer);
+    casesState.all = [...SAMPLE_CASES];
+    document.getElementById('cases-loading').classList.add('hidden');
+    document.getElementById('cases-results').classList.remove('hidden');
+    document.getElementById('cases-found').textContent = casesState.all.length;
+    renderCases();
+  }, 3200);
+}
+
+function renderCases() {
+  let display = [...casesState.all];
+  if (casesState.statusFilter) {
+    display = display.filter(c => c.caseStatus === casesState.statusFilter);
+  }
+  display.sort((a, b) => {
+    if (casesState.sortBy === 'newest') return parseCaseDate(b.dateFiled) - parseCaseDate(a.dateFiled);
+    if (casesState.sortBy === 'oldest') return parseCaseDate(a.dateFiled) - parseCaseDate(b.dateFiled);
+    if (casesState.sortBy === 'type') return (a.caseType || '').localeCompare(b.caseType || '');
+    if (casesState.sortBy === 'status') return (a.caseStatus || '').localeCompare(b.caseStatus || '');
+    return 0;
+  });
+
+  const list = document.getElementById('cases-list');
+  if (display.length === 0) {
+    list.innerHTML = `<div class="bento p-10 text-center border-dashed"><p class="text-fg-2">Sud ishlari topilmadi.</p></div>`;
+    refreshIcons();
+    return;
+  }
+
+  list.innerHTML = display.map((c, i) => caseCardHTML(c, i)).join('');
+  refreshIcons();
+
+  // Wire up expand buttons
+  list.querySelectorAll('[data-case-expand]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.caseExpand;
+      const target = document.getElementById(id);
+      const isExpanded = btn.dataset.expanded === 'true';
+      if (isExpanded) {
+        target.style.maxHeight = '0';
+        target.style.opacity = '0';
+        target.style.marginTop = '0';
+        btn.dataset.expanded = 'false';
+        btn.querySelector('.expand-label').textContent = "Tafsilotlarni ko'rish";
+        btn.querySelector('.expand-icon').style.transform = 'rotate(0deg)';
+      } else {
+        target.style.maxHeight = '4000px';
+        target.style.opacity = '1';
+        target.style.marginTop = '16px';
+        btn.dataset.expanded = 'true';
+        btn.querySelector('.expand-label').textContent = 'Tafsilotlarni yashirish';
+        btn.querySelector('.expand-icon').style.transform = 'rotate(180deg)';
+      }
+    });
+  });
+}
+
+function parseCaseDate(s) {
+  if (!s) return 0;
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]).getTime();
+  return 0;
+}
+
+function caseCardHTML(c, idx) {
+  const expandId = `case-expand-${idx}`;
+  const g = c.detail?.general;
+
+  return `
+    <article class="bento bento-hover p-5 sm:p-6 anim-fade-up">
+      <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
+        <div class="space-y-1.5 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-bold text-fg-3">#${idx + 1}</span>
+            <h3 class="font-mono tabular-nums text-[15px] font-bold text-white tracking-tight-2 break-all flex items-center gap-2">
+              ${gi('layers', 18, 'text-fg-3')}
+              ${c.caseNumber}
+            </h3>
+            <button class="btn-icon" onclick="copyText('${c.caseNumber}', this)" aria-label="Nusxalash">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          ${c.caseType ? `
+            <p class="text-[13px] text-fg-2 flex items-center gap-1.5">
+              ${gi('scroll', 14, 'text-fg-3')}
+              ${c.caseType}
+            </p>
+          ` : ''}
+        </div>
+        <div class="flex items-center gap-2 flex-wrap shrink-0">
+          ${caseStatusBadge(c.caseStatus)}
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+        <div class="info-row">
+          <p class="label">${gi('company', 12, 'text-fg-3')}Sud</p>
+          <p class="value">${c.courtName || '—'}</p>
+        </div>
+        <div class="info-row">
+          <p class="label">${gi('calendar', 12, 'text-fg-3')}Ariza berilgan sana</p>
+          <p class="value mono">${c.dateFiled || '—'}</p>
+        </div>
+        <div class="info-row">
+          <p class="label">${gi('company', 12, 'text-fg-3')}Da'vogar</p>
+          <p class="value">${c.plaintiff || '—'}</p>
+        </div>
+        <div class="info-row">
+          <p class="label">${gi('company', 12, 'text-fg-3')}Javobgar</p>
+          <p class="value">${c.defendant || '—'}</p>
+        </div>
+      </div>
+
+      ${c.result && c.result !== '—' ? `
+        <div class="rounded-2xl border border-accent/20 bg-accent/5 p-3.5 flex items-center gap-2 flex-wrap mt-4" style="backdrop-filter:blur(12px) saturate(140%);-webkit-backdrop-filter:blur(12px) saturate(140%);">
+          ${gi('certificate', 16, 'text-accent')}
+          <span class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold">Natija:</span>
+          <span class="font-bold text-accent text-sm">${c.result}</span>
+        </div>
+      ` : ''}
+
+      <button class="btn btn-ghost w-full sm:w-auto mt-5" data-case-expand="${expandId}" data-expanded="false">
+        <i data-lucide="chevron-down" class="w-4 h-4 expand-icon transition-transform"></i>
+        <span class="expand-label">Tafsilotlarni ko'rish</span>
+      </button>
+
+      <div id="${expandId}" class="overflow-hidden transition-all" style="max-height: 0; opacity: 0; margin-top: 0;">
+        ${renderCaseDetail(c.detail)}
+      </div>
+    </article>
+  `;
+}
+
+function renderCaseDetail(detail) {
+  if (!detail) return `<p class="text-sm text-fg-3 text-center py-4">Ish tafsilotlari mavjud emas.</p>`;
+  const g = detail.general;
+  const instances = detail.instances || [];
+
+  // General info grid
+  const generalRows = [
+    { label: 'Sud',           value: g?.court,        slug: 'company' },
+    { label: 'Ish raqami',    value: g?.caseNumber,   slug: 'layers', mono: true },
+    { label: 'Ish turi',      value: g?.caseType,     slug: 'scroll' },
+    { label: 'Ish holati',    value: CASE_STATUS_LABELS[g?.caseStatus]?.label || g?.caseStatus, slug: 'certificate' },
+    { label: 'Sudya',         value: g?.judge,        slug: 'briefcase' },
+    { label: 'Da\'vo predmeti', value: g?.claimSubject, slug: 'scroll' },
+    { label: 'Kotib',         value: g?.secretary,    slug: 'briefcase' },
+    { label: 'Da\'vogar',     value: g?.plaintiff,    slug: 'company' },
+    { label: 'Javobgar',      value: g?.defendant,    slug: 'company' },
+  ].filter(r => r.value && r.value !== '—');
+
+  return `
+    <div class="pt-4 border-t border-white/7 space-y-4">
+      <p class="h-section flex items-center gap-1.5">
+        ${gi('scroll', 14, 'text-fg-3')}
+        Umumiy ma'lumotlar
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        ${generalRows.map(r => `
+          <div class="info-row">
+            <p class="label">${gi(r.slug, 12, 'text-fg-3')}${r.label}</p>
+            <p class="value ${r.mono ? 'mono' : ''}">${r.value}</p>
+          </div>
+        `).join('')}
+      </div>
+
+      ${instances.map(inst => renderInstance(inst)).join('')}
+    </div>
+  `;
+}
+
+function renderInstance(inst) {
+  const hearings = inst.hearings || [];
+  const documents = inst.documents || [];
+  const decision = inst.decision;
+  return `
+    <div class="rounded-2xl border border-white/7 bg-white/[0.02] mt-3 overflow-hidden" style="backdrop-filter:blur(12px) saturate(140%);-webkit-backdrop-filter:blur(12px) saturate(140%);">
+      <div class="px-4 py-3 border-b border-white/7 flex items-center gap-2 bg-white/[0.02]">
+        ${gi('layers', 16, 'text-fg-3')}
+        <p class="font-bold text-white text-[14px]">${inst.title}</p>
+        <span class="text-fg-3 text-xs">(${hearings.length} ta majlis${documents.length > 0 ? `, ${documents.length} ta hujjat` : ''})</span>
+      </div>
+      <div class="p-4 space-y-4">
+
+        ${hearings.length > 0 ? `
+          <div class="space-y-2">
+            <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold flex items-center gap-1.5">
+              ${gi('calendar', 13, 'text-fg-3')}
+              Sud majlislari
+            </p>
+            ${hearings.map(h => `
+              <div class="rounded-xl border border-white/7 bg-white/[0.02] p-3 flex items-start gap-3" style="backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);">
+                <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 shrink-0 mt-0.5">
+                  ${gi('clock', 14, 'text-fg-3')}
+                </div>
+                <div class="flex-1 min-w-0 space-y-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-mono tabular-nums text-sm font-bold text-white">${h.date}${h.time ? ' ' + h.time : ''}</span>
+                    ${hearingStatusBadge(h.status)}
+                  </div>
+                  ${h.courtroom ? `<p class="text-xs text-fg-2">Sud zali: ${h.courtroom}</p>` : ''}
+                  ${h.judge ? `<p class="text-xs text-fg-2">Sudya: ${h.judge}</p>` : ''}
+                  ${h.postponementReason ? `<p class="text-xs text-sky-400/80">Kechiktirildi: ${h.postponementReason}</p>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        ${decision ? `
+          <div class="rounded-xl border border-accent/20 bg-accent/5 p-3.5 space-y-1.5 text-sm" style="backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);">
+            <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold flex items-center gap-1.5">
+              ${gi('certificate', 13, 'text-accent')}
+              Qaror
+            </p>
+            ${decision.date ? `<p><span class="text-fg-3 text-xs">Sana: </span><span class="font-mono tabular-nums">${decision.date}</span></p>` : ''}
+            ${decision.type ? `<p><span class="text-fg-3 text-xs">Turi: </span>${decision.type}</p>` : ''}
+            ${decision.text ? `<p class="break-words"><span class="text-fg-3 text-xs">Matni: </span>${decision.text}</p>` : ''}
+            ${decision.awardedAmount && decision.awardedAmount !== '—' ? `<p><span class="text-fg-3 text-xs">Undirilgan summa: </span><span class="font-mono tabular-nums text-accent">${decision.awardedAmount}</span></p>` : ''}
+            ${decision.stateDutyRecovered && decision.stateDutyRecovered !== '—' ? `<p><span class="text-fg-3 text-xs">Qaytarilgan davlat boji: </span><span class="font-mono tabular-nums">${decision.stateDutyRecovered}</span></p>` : ''}
+            ${decision.enforcedDate && decision.enforcedDate !== '—' ? `<p><span class="text-fg-3 text-xs">Ijro etilgan sana: </span><span class="font-mono tabular-nums">${decision.enforcedDate}</span></p>` : ''}
+          </div>
+        ` : ''}
+
+        ${documents.length > 0 ? `
+          <div class="space-y-2">
+            <p class="text-[10.5px] uppercase tracking-[0.06em] text-fg-3 font-semibold flex items-center gap-1.5">
+              ${gi('scroll', 13, 'text-fg-3')}
+              Hujjatlar (${documents.length})
+            </p>
+            ${documents.map(d => `
+              <a href="#" onclick="event.preventDefault();" class="flex items-center gap-2 rounded-xl border border-white/7 bg-white/[0.02] p-2.5 text-sm hover:bg-white/5 hover:border-accent/20 transition-colors">
+                <i data-lucide="external-link" class="w-3.5 h-3.5 text-fg-3 shrink-0"></i>
+                <span class="flex-1 min-w-0 truncate text-fg">${d.name}</span>
+                ${d.date ? `<span class="font-mono tabular-nums text-xs text-fg-3 shrink-0">${d.date}</span>` : ''}
+              </a>
+            `).join('')}
+          </div>
+        ` : ''}
+
+      </div>
+    </div>
+  `;
+}
+
+document.getElementById('case-sort-select').addEventListener('change', e => {
+  casesState.sortBy = e.target.value;
+  renderCases();
+});
+document.getElementById('case-status-filter').addEventListener('change', e => {
+  casesState.statusFilter = e.target.value;
+  renderCases();
+});
+
+/* ============================================================
+   HEARINGS — saved companies, fetch, render
+   ============================================================ */
+let hearingsState = {
+  loading: false,
+  elapsed: 0,
+  timer: null,
+};
+
+function renderSavedCompanies() {
+  document.getElementById('saved-count').textContent = savedCompanies.length;
+  const list = document.getElementById('saved-companies-list');
+  if (savedCompanies.length === 0) {
+    list.innerHTML = `<div class="bento p-6 text-center text-fg-3 text-sm border-dashed">Saqlangan kompaniyalar yo'q.</div>`;
+    refreshIcons();
+    return;
+  }
+  list.innerHTML = savedCompanies.map(c => `
+    <div class="bento bento-hover p-4 cursor-pointer ${currentSelectedTin === c.tin ? 'border-accent/40' : ''}" onclick="fetchHearings('${c.tin}')">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <p class="font-bold text-white truncate text-[14px]">${c.name}</p>
+          <p class="font-mono tabular-nums text-sm text-fg-2 mt-0.5">${formatTin(c.tin)}</p>
+        </div>
+        <button class="btn-icon" onclick="event.stopPropagation(); removeSavedCompany('${c.tin}')" aria-label="O'chirish">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+      ${currentSelectedTin === c.tin ? `
+        <p class="text-[11px] text-accent mt-2 flex items-center gap-1">
+          <span class="spinner" style="width:10px;height:10px;border-width:1.5px;"></span>
+          Tanlangan
+        </p>
+      ` : ''}
+    </div>
+  `).join('');
+  refreshIcons();
+}
+
+function addSavedCompany() {
+  const tinInput = document.getElementById('add-tin-input');
+  const nameInput = document.getElementById('add-name-input');
+  const tin = tinInput.value.replace(/\D/g, '').slice(0, 9);
+  if (tin.length !== 9) return;
+  if (savedCompanies.find(c => c.tin === tin)) {
+    tinInput.value = ''; nameInput.value = '';
+    return;
+  }
+  const name = nameInput.value.trim() || `STIR ${formatTin(tin)}`;
+  savedCompanies.unshift({ tin, name, savedAt: Date.now() });
+  tinInput.value = ''; nameInput.value = '';
+  renderSavedCompanies();
+}
+
+function removeSavedCompany(tin) {
+  savedCompanies = savedCompanies.filter(c => c.tin !== tin);
+  if (currentSelectedTin === tin) {
+    currentSelectedTin = null;
+    document.getElementById('hearings-results').classList.add('hidden');
+    document.getElementById('hearings-loading').classList.add('hidden');
+  }
+  renderSavedCompanies();
+}
+
+function fetchHearings(tin) {
+  currentSelectedTin = tin;
+  renderSavedCompanies();
+  document.getElementById('hearings-results').classList.add('hidden');
+  document.getElementById('hearings-loading').classList.remove('hidden');
+  document.getElementById('hearings-loading-tin').textContent = formatTin(tin);
+
+  hearingsState.elapsed = 0;
+  document.getElementById('hearings-elapsed').textContent = '0';
+  if (hearingsState.timer) clearInterval(hearingsState.timer);
+  hearingsState.timer = setInterval(() => {
+    hearingsState.elapsed++;
+    document.getElementById('hearings-elapsed').textContent = hearingsState.elapsed;
+  }, 1000);
+
+  setTimeout(() => {
+    clearInterval(hearingsState.timer);
+    document.getElementById('hearings-loading').classList.add('hidden');
+    document.getElementById('hearings-results').classList.remove('hidden');
+    document.getElementById('hearings-tin').textContent = formatTin(tin);
+    document.getElementById('hearings-count').textContent = SAMPLE_HEARINGS.length;
+    renderHearings();
+  }, 2800);
+}
+
+function renderHearings() {
+  const list = document.getElementById('hearings-list');
+  list.innerHTML = SAMPLE_HEARINGS.map((h, i) => `
+    <article class="bento bento-hover p-5 sm:p-6 anim-fade-up-${Math.min(i + 1, 6)}">
+      <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5">
+        <div class="space-y-1.5 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-bold text-fg-3">#${i + 1}</span>
+            <h3 class="font-mono tabular-nums text-[15px] font-bold text-white tracking-tight-2 break-all flex items-center gap-2">
+              ${gi('layers', 18, 'text-fg-3')}
+              ${h.caseNumber}
+            </h3>
+            <button class="btn-icon" onclick="copyText('${h.caseNumber}', this)" aria-label="Nusxalash">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          <p class="text-[13px] text-fg-2 flex items-center gap-1.5">
+            ${gi('scroll', 14, 'text-fg-3')}
+            ${h.caseType} · ${CASE_STATUS_LABELS[h.caseStatus]?.label || h.caseStatus}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap shrink-0">
+          ${courtTypeBadge(h.courtType?.toUpperCase())}
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+        <div class="info-row">
+          <p class="label">${gi('calendar', 12, 'text-fg-3')}Majlis sanasi</p>
+          <p class="value mono">${h.hearingDate}${h.hearingTime ? ' · ' + h.hearingTime : ''}</p>
+        </div>
+        <div class="info-row">
+          <p class="label">${gi('company', 12, 'text-fg-3')}Sud</p>
+          <p class="value">${h.courtName || '—'}</p>
+        </div>
+        <div class="info-row">
+          <p class="label">${gi('briefcase', 12, 'text-fg-3')}Sudya</p>
+          <p class="value">${h.judge || '—'}</p>
+        </div>
+        <div class="info-row">
+          <p class="label">${gi('company', 12, 'text-fg-3')}Tomonlar</p>
+          <p class="value text-[13px]"><span class="text-fg-3">D:</span> ${h.plaintiff || '—'}<br><span class="text-fg-3">J:</span> ${h.defendant || '—'}</p>
+        </div>
+      </div>
+    </article>
+  `).join('');
+  refreshIcons();
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function copyText(text, btn) {
+  // Try clipboard API; fall back to a temporary textarea
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  };
+  const showDone = () => {
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = `<i data-lucide="check-check" class="w-3.5 h-3.5 text-emerald-400"></i>`;
+    btn.style.borderColor = 'rgba(52, 211, 153, 0.4)';
+    refreshIcons();
+    setTimeout(() => { btn.innerHTML = orig; btn.style.borderColor = ''; refreshIcons(); }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(showDone).catch(() => { fallback(); showDone(); });
+  } else {
+    fallback(); showDone();
+  }
+}
+
+/* ============================================================
+   ASCII ART BACKGROUND
+   Three lightweight procedural effects cycle on a 28fps loop:
+     1. Flow field   — every cell filled via sine-noise waves
+     2. Ripples      — fixed emitters, perfect 18s loop
+     3. Game of Life — Conway's CA with age buffer + reseed
+   Two stacked <pre> layers cross-fade between effects. Each time
+   an effect becomes active (initial load OR on transition) it
+   picks a fresh cold-palette color at random, so the page never
+   looks the same twice. A radial vignette keeps the center
+   readable while darkening the edges. No HUD, no controls.
+   ============================================================ */
+function initAsciiBackground() {
+  const FONT_FAMILY = "'JetBrains Mono','Fira Code','Courier New',monospace";
+  const FONT_PX = 14;
+  const TARGET_FPS = 28;
+  const HOLD_MS = 13000;
+  const TRANSITION_MS = 2200;
+
+  const stage = document.getElementById('ascii-stage');
+  const layerA = document.getElementById('layerA');
+  const layerB = document.getElementById('layerB');
+  if (!stage || !layerA || !layerB) return;
+
+  const layers = [layerA, layerB];
+  layers.forEach(l => {
+    l.style.fontFamily = FONT_FAMILY;
+    l.style.fontSize = FONT_PX + 'px';
+    l.style.lineHeight = '1';
+  });
+  layers[0].style.opacity = 1;
+  layers[1].style.opacity = 0;
+
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function debounce(fn, ms) { let id; return (...a) => { clearTimeout(id); id = setTimeout(() => fn(...a), ms); }; }
+
+  function measureChar() {
+    const probe = document.createElement('pre');
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    probe.style.margin = '0';
+    probe.style.padding = '0';
+    probe.style.whiteSpace = 'pre';
+    probe.style.fontFamily = FONT_FAMILY;
+    probe.style.fontSize = FONT_PX + 'px';
+    probe.style.lineHeight = '1';
+    probe.textContent = 'M'.repeat(40);
+    document.body.appendChild(probe);
+    const rect = probe.getBoundingClientRect();
+    document.body.removeChild(probe);
+    return { w: rect.width / 40, h: rect.height };
+  }
+
+  let cols = 0, rows = 0, charSize = measureChar();
+  function resize() {
+    charSize = measureChar();
+    cols = Math.ceil(window.innerWidth / charSize.w) + 1;
+    rows = Math.ceil(window.innerHeight / charSize.h) + 1;
+  }
+  window.addEventListener('resize', debounce(resize, 150));
+  resize();
+
+  function rampChar(ramp, v) {
+    const i = Math.min(ramp.length - 1, Math.max(0, Math.floor(clamp01(v) * ramp.length)));
+    return ramp[i];
+  }
+
+  // Cold color palette — randomly picked per effect activation
+  const PALETTE = [
+    { color: '#38bdf8', glow: 'rgba(56,189,248,.45)' },
+    { color: '#818cf8', glow: 'rgba(129,140,248,.45)' },
+    { color: '#34d399', glow: 'rgba(52,211,153,.45)' },
+    { color: '#a78bfa', glow: 'rgba(167,139,250,.45)' },
+    { color: '#7dd3fc', glow: 'rgba(125,211,252,.45)' },
+    { color: '#2dd4bf', glow: 'rgba(45,212,191,.45)' },
+  ];
+  const pickColor = () => PALETTE[(Math.random() * PALETTE.length) | 0];
+
+  // (1) FLOW FIELD — fills entire screen with sine-noise waves
+  function flowFieldEffect() {
+    return {
+      name: 'flow field',
+      ramp: ' .:-=+*#%@',
+      color: '#38bdf8',
+      glow: 'rgba(56,189,248,.45)',
+      field(cols, rows, t) {
+        const out = new Float32Array(cols * rows);
+        const s = 0.09;
+        for (let y = 0; y < rows; y++) {
+          const ny = y * s * 1.9;
+          for (let x = 0; x < cols; x++) {
+            const nx = x * s;
+            let v = Math.sin(nx + t * 0.6)
+                  + Math.sin(ny * 1.3 - t * 0.4)
+                  + Math.sin((nx + ny) * 0.7 + t * 0.25)
+                  + Math.sin(Math.sqrt(nx * nx + ny * ny) * 0.8 - t * 0.8);
+            out[y * cols + x] = clamp01((v + 4) / 8);
+          }
+        }
+        return out;
+      }
+    };
+  }
+
+  // (2) RIPPLES — expanding rings from fixed emitters, perfect 18s loop
+  function rippleEffect() {
+    const LOOP = 18;
+    const CYCLES = 5;
+    const OMEGA = (2 * Math.PI * CYCLES) / LOOP;
+    const emitters = [
+      { ox: 0.25, oy: 0.30, ph: 0 },
+      { ox: 0.75, oy: 0.25, ph: 6 },
+      { ox: 0.50, oy: 0.75, ph: 12 },
+    ];
+    return {
+      name: 'ripples',
+      ramp: ' .:-=+*#%@',
+      color: '#818cf8',
+      glow: 'rgba(129,140,248,.45)',
+      field(cols, rows, t) {
+        const lt = t % LOOP;
+        const out = new Float32Array(cols * rows);
+        const aspect = 1.9;
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            let v = 0;
+            for (const e of emitters) {
+              const et = (lt + e.ph) % LOOP;
+              const dx = x - e.ox * cols;
+              const dy = (y - e.oy * rows) * aspect;
+              const d = Math.sqrt(dx * dx + dy * dy) * 0.35;
+              v += Math.sin(d - et * OMEGA) / (1 + d * 0.06);
+            }
+            out[y * cols + x] = clamp01((v + 1.5) / 3);
+          }
+        }
+        return out;
+      }
+    };
+  }
+
+  // (3) CELLULAR AUTOMATON — Conway's Game of Life
+  function gameOfLifeEffect() {
+    let W = 0, H = 0, cells = null, age = null, acc = 0, genCount = 0;
+    const STEP = 0.12, MAX_GEN = 140;
+    function seed(w, h) {
+      cells = new Uint8Array(w * h);
+      for (let i = 0; i < cells.length; i++) cells[i] = Math.random() < 0.22 ? 1 : 0;
+      age = new Float32Array(w * h);
+      genCount = 0;
+    }
+    function ensure(w, h) { if (W === w && H === h && cells) return; W = w; H = h; seed(w, h); }
+    function neighbors(x, y) {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const xx = (x + dx + W) % W, yy = (y + dy + H) % H;
+        n += cells[yy * W + xx];
+      }
+      return n;
+    }
+    function step() {
+      const next = new Uint8Array(W * H);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const idx = y * W + x, n = neighbors(x, y), alive = cells[idx];
+        next[idx] = alive ? (n === 2 || n === 3 ? 1 : 0) : (n === 3 ? 1 : 0);
+      }
+      cells = next;
+      genCount++;
+      if (genCount > MAX_GEN) seed(W, H);
+    }
+    return {
+      name: 'cellular automaton',
+      ramp: ' .,:-=+*#%@',
+      color: '#34d399',
+      glow: 'rgba(52,211,153,.45)',
+      field(cols, rows, t, dt) {
+        ensure(cols, rows);
+        acc += dt;
+        if (acc >= STEP) { acc = 0; step(); }
+        const out = new Float32Array(cols * rows);
+        for (let i = 0; i < cols * rows; i++) {
+          age[i] = cells[i] ? Math.min(1, age[i] + 0.5) : Math.max(0, age[i] - 0.08);
+          out[i] = age[i];
+        }
+        return out;
+      }
+    };
+  }
+
+  const effects = [flowFieldEffect(), rippleEffect(), gameOfLifeEffect()];
+
+  function drawLayer(layerEl, effect, t, dt) {
+    layerEl.style.color = effect.color;
+    layerEl.style.textShadow = '0 0 6px ' + effect.glow + ', 0 0 14px ' + effect.glow;
+    const field = effect.field(cols, rows, t, dt);
+    const ramp = effect.ramp;
+    let out = '';
+    for (let y = 0; y < rows; y++) {
+      let row = '';
+      for (let x = 0; x < cols; x++) row += rampChar(ramp, field[y * cols + x]);
+      out += row + (y < rows - 1 ? '\n' : '');
+    }
+    layerEl.textContent = out;
+  }
+
+  let activeIdx = 0, curPos = 0, current = effects[0], nextEffect = null;
+  let paused = false, transitioning = false, transitionStart = 0, holdStart = performance.now();
+  const t0 = performance.now();
+  let lastT = t0;
+  const FRAME_MS = 1000 / TARGET_FPS;
+
+  // Assign random cold color on activation
+  function assignRandomColor(effect) {
+    const c = pickColor();
+    effect.color = c.color;
+    effect.glow = c.glow;
+  }
+  assignRandomColor(current);
+
+  let visible = true;
+  document.addEventListener('visibilitychange', () => {
+    visible = !document.hidden;
+    if (visible) {
+      lastT = performance.now();
+      holdStart = performance.now();
+    }
+  });
+
+  function startTransitionTo(i) {
+    if (i === curPos && !transitioning) return;
+    curPos = i;
+    nextEffect = effects[curPos];
+    assignRandomColor(nextEffect);
+    transitioning = true;
+    transitionStart = performance.now();
+  }
+
+  function render(now) {
+    requestAnimationFrame(render);
+    const dtMs = now - lastT;
+    if (dtMs < FRAME_MS || paused || !visible) return;
+    lastT = now;
+    const dt = Math.min(dtMs, 100) / 1000;
+    const t = (now - t0) / 1000;
+
+    drawLayer(layers[activeIdx], current, t, dt);
+
+    if (!transitioning && now - holdStart > HOLD_MS) {
+      startTransitionTo((curPos + 1) % effects.length);
+    }
+    if (transitioning) {
+      const inactiveIdx = 1 - activeIdx;
+      drawLayer(layers[inactiveIdx], nextEffect, t, dt);
+      const p = clamp01((now - transitionStart) / TRANSITION_MS);
+      layers[activeIdx].style.opacity = 1 - p;
+      layers[inactiveIdx].style.opacity = p;
+      if (p >= 1) {
+        transitioning = false;
+        activeIdx = inactiveIdx;
+        current = nextEffect;
+        holdStart = now;
+      }
+    }
+  }
+  requestAnimationFrame(render);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function init() {
+  // Wire up INN input formatting
+  const innInput = document.getElementById('inn-input');
+  innInput.addEventListener('input', e => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 9);
+  });
+  const addTinInput = document.getElementById('add-tin-input');
+  if (addTinInput) {
+    addTinInput.addEventListener('input', e => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 9);
+    });
+  }
+  const caseValueInput = document.getElementById('case-value-input');
+  if (caseValueInput) {
+    caseValueInput.addEventListener('input', e => {
+      const mode = document.getElementById('case-mode-select').value;
+      if (mode === 'tin') {
+        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 9);
+      } else if (mode === 'pinfl') {
+        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 14);
+      }
+    });
+  }
+
+  // Render saved companies on init
+  renderSavedCompanies();
+
+  // Position tab pill initially
+  positionTabPill(currentTab);
+  // Reposition on resize (tab button widths may change)
+  window.addEventListener('resize', () => positionTabPill(currentTab));
+
+  // Initial Lucide icon render
+  refreshIcons();
+
+  // Start ASCII art animated background
+  initAsciiBackground();
+
+  // Adaptive header blur — intensifies on scroll
+  const header = document.querySelector('.app-header');
+  if (header) {
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      if (y > 100) {
+        header.style.backdropFilter = 'blur(24px) saturate(180%)';
+        header.style.webkitBackdropFilter = 'blur(24px) saturate(180%)';
+      } else {
+        header.style.backdropFilter = 'blur(14px) saturate(140%)';
+        header.style.webkitBackdropFilter = 'blur(14px) saturate(140%)';
+      }
+    }, { passive: true });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

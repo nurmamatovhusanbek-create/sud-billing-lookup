@@ -1,0 +1,5 @@
+SOCKSPort 127.0.0.1:9050
+DataDirectory C:\Users\nurma\Desktop\lookup\.tor-data
+Log notice file C:\Users\nurma\Desktop\lookup\.tor-log\notice.log
+AvoidDiskWrites 1
+ExitPolicy accept *:*

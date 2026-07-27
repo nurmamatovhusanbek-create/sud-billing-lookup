@@ -76,14 +76,24 @@ export interface CompanyStats {
  * Normalize a company/party name for matching:
  *  - strip surrounding quotes (", «, », „, ", ', etc.)
  *  - lowercase
- *  - expand "MChJ" → "масъулияти чекланган жамияти" (and AJ → "акционерлик жамияти")
- *    so abbreviations and full Uzbek forms match each other
+ *  - expand "MChJ" → "mas'uliyati cheklangan jamiyati" (Latin) and
+ *    "масъулияти чекланган жамияти" (Cyrillic) so abbreviations and full
+ *    Uzbek forms match each other regardless of script. Same for AJ →
+ *    "aktsiyadorlik jamiyati" / "акционерлик жамияти". The sud.uz APIs return
+ *    Cyrillic, but orginfo.uz + chamber.uz sometimes return Latin — we cover
+ *    both so matching works in either direction.
  *  - collapse whitespace
  */
 function normalizeName(s: string): string {
   return (s || '')
     .replace(/["«»“”„"'’‘`]/g, '')
     .toLowerCase()
+    // Latin Uzbek expansions
+    .replace(/\bmchj\b/g, "mas'uliyati cheklangan jamiyati")
+    .replace(/\baj\b/g, 'aktsiyadorlik jamiyati')
+    .replace(/\booo\b/g, "mas'uliyati cheklangan jamiyati")
+    .replace(/\boao\b/g, 'aktsiyadorlik jamiyati')
+    // Cyrillic Uzbek expansions (match what jadvalapi / jadval APIs return)
     .replace(/\bmchj\b/g, 'масъулияти чекланган жамияти')
     .replace(/\baj\b/g, 'акционерлик жамияти')
     .replace(/\booo\b/g, 'масъулияти чекланган жамияти')
@@ -125,11 +135,15 @@ function nameMatches(companyNorm: string, partyNorm: string): boolean {
  * / PENDING, based on the company's role.
  *
  * Per user's rule (Interpretation A from STATS-TAB-SPEC.md):
- *   - To'liq qanoatlantirilgan / Қисман қаноатлантирилган → WIN (both roles)
- *   - Рад этилган / Қайтарилган / Кўрмасдан қолдирилган
+ *   - To'liq qanoatlantirilgan / Qisman qanoatlantirilgan → WIN (both roles)
+ *   - Rad etilgan / Qaytarilgan / Ko'rmasdan qoldirilgan
  *       → plaintiff: LOSE
  *       → defendant: NEUTRAL
  *   - empty / unknown / pending → PENDING
+ *
+ * The matching checks BOTH Cyrillic and Latin forms because the sud.uz APIs
+ * return Cyrillic while some downstream sources (chamber.uz, our own UI)
+ * produce Latin.
  */
 function classifyOutcome(role: PartyRole, result: string): Classification {
   const r = (result || '')
@@ -141,13 +155,13 @@ function classifyOutcome(role: PartyRole, result: string): Classification {
 
   const full = r.includes('тўлиқ') || r.includes("to'liq") || r.includes('toliq')
   const partial = r.includes('қисман') || r.includes('qisman')
-  // "Рад этилган" (rad etilgan) and "Рад қилинган" (rad qilingan) are both
-  // rejection outcomes — match on the key word "рад" / "rad" alone.
+  // "Rad etilgan" and "Rad qilingan" are both rejection outcomes — match on
+  // the key word "rad" alone (Cyrillic "рад" / Latin "rad ").
   const rejected = r.includes('рад') || r.includes('rad ')
   const returned = r.includes('қайтарилган') || r.includes('qaytarilgan')
   const leftWithoutReview =
     r.includes('кўрмасдан') || r.includes("ko'rmasdan") || r.includes('kormasdan')
-  // "Иш юритишдан тугатилган" — case terminated without ruling. Treat the
+  // "Ish yuritishdan tugatilgan" — case terminated without ruling. Treat the
   // same as a rejection (plaintiff: LOSE, defendant: NEUTRAL).
   const terminated = r.includes('тугатилган') || r.includes('tugatilgan')
 

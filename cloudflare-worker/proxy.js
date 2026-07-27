@@ -75,6 +75,7 @@ const sudProxyWorker = {
       'www.mib.uz',
       'chamber.uz',
       'admin.chamber.uz',
+      'ihamkor.uz',
     ]
     if (!ALLOWED_HOSTS.includes(target.hostname)) {
       return new Response(

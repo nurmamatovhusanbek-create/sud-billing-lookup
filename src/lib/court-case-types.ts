@@ -91,9 +91,16 @@ export interface FullCaseData {
 }
 
 // ---- Status enums for UI ----
+// IMPORTANT: the KEYS are Cyrillic Uzbek because that is what the sud.uz APIs
+// (jadvalapi.sud.uz / jadval.sud.uz) return in their `status_name` / `instance`
+// fields. We look up the API value against these keys, then DISPLAY the `.en`
+// field (which holds the Latin-Uzbek label) — never the raw Cyrillic key.
+// Latin-Uzbek keys are ALSO included so synthetic Latin status strings (e.g.
+// the ones we set locally in StatsTab → CourtCase conversion) resolve too.
 
 export const CASE_STATUSES: Record<string, { en: string; color: string }> = {
-  'Иш юритувда': { en: 'Ish yuritilmoqda', color: '#2563a8' },
+  // Cyrillic keys — match API responses
+  'Иш юритувда': { en: 'Ish yurituvda', color: '#2563a8' },
   'Кўриб чиқилмоқда': { en: "Ko'rib chiqilmoqda", color: '#2563a8' },
   'Тугатилган': { en: 'Tugatilgan', color: '#1e7e44' },
   'Тўхтатилган': { en: "To'xtatilgan", color: '#c47d0e' },
@@ -102,19 +109,39 @@ export const CASE_STATUSES: Record<string, { en: string; color: string }> = {
   'Кассацияда': { en: 'Kassatsiyada', color: '#4a1d96' },
   'Назоратда': { en: 'Nazoratda', color: '#b91c1c' },
   'Ижро этилмоқда': { en: 'Ijro etilmoqda', color: '#0e7490' },
+  // Latin keys — match synthetic / Latin API responses
+  'Ish yurituvda': { en: 'Ish yurituvda', color: '#2563a8' },
+  "Ko'rib chiqilmoqda": { en: "Ko'rib chiqilmoqda", color: '#2563a8' },
+  'Tugatilgan': { en: 'Tugatilgan', color: '#1e7e44' },
+  "To'xtatilgan": { en: "To'xtatilgan", color: '#c47d0e' },
+  'Bekor qilingan': { en: 'Bekor qilingan', color: '#6b7280' },
+  'Apellyatsiyada': { en: 'Apellyatsiyada', color: '#6d3db5' },
+  'Kassatsiyada': { en: 'Kassatsiyada', color: '#4a1d96' },
+  'Nazoratda': { en: 'Nazoratda', color: '#b91c1c' },
+  'Ijro etilmoqda': { en: 'Ijro etilmoqda', color: '#0e7490' },
 }
 
 export const HEARING_STATUSES: Record<string, { en: string; color: string }> = {
+  // Cyrillic keys — match API responses
   'Тайинланган': { en: 'Tayinlangan', color: '#3b82f6' },
   'Кечиктирилган': { en: 'Kechiktirilgan', color: '#f59e0b' },
   'Ўтказилган': { en: "O'tkazilgan", color: '#10b981' },
   'Бекор қилинган': { en: 'Bekor qilingan', color: '#9ca3af' },
   'Якунланган': { en: 'Yakunlangan', color: '#1e7e44' },
+  // Latin keys — match synthetic / Latin API responses
+  'Tayinlangan': { en: 'Tayinlangan', color: '#3b82f6' },
+  'Kechiktirilgan': { en: 'Kechiktirilgan', color: '#f59e0b' },
+  "O'tkazilgan": { en: "O'tkazilgan", color: '#10b981' },
+  'Bekor qilingan': { en: 'Bekor qilingan', color: '#9ca3af' },
+  'Yakunlangan': { en: 'Yakunlangan', color: '#1e7e44' },
 }
 
+// `uz` is Latin-Uzbek (display). `en` is English (used as a fallback / for
+// English-locale tabs). The Cyrillic forms are NOT stored here — they come
+// back from the sud.uz APIs and are matched via the keys above.
 export const COURT_TYPE_LABELS: Record<CourtType, { uz: string; en: string }> = {
-  economic: { uz: 'Иқтисодий судлар', en: 'Economic Courts' },
-  civil: { uz: 'Фуқаролик судлар', en: 'Civil Courts' },
-  criminal: { uz: 'Жиноят ишлари', en: 'Criminal Courts' },
-  administrative: { uz: 'Маъмурий ишлар', en: 'Administrative Courts' },
+  economic: { uz: 'Iqtisodiy sudlar', en: 'Economic Courts' },
+  civil: { uz: 'Fuqarolik sudlar', en: 'Civil Courts' },
+  criminal: { uz: 'Jinoyat ishlari', en: 'Criminal Courts' },
+  administrative: { uz: "Ma'muriy ishlar", en: 'Administrative Courts' },
 }

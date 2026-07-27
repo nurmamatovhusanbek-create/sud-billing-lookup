@@ -530,10 +530,22 @@ function parseCompanyPage(html: string, tin: string, url: string): CompanyInfo {
     address = addrParts.join(', ').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/g, "'")
   }
 
+  // The orginfo.uz organization page historically renders the official-name
+  // and short-name labels in Russian ("Официальное название организации" /
+  // "Краткое название организации"). Some pages also expose Latin-Uzbek
+  // labels ("Rasmiy nomi" / "Qisqa nomi"). Try the Russian label first
+  // (most reliable across all org pages), then fall back to the Latin label.
+  const officialName =
+    extractField(html, 'Официальное название организации') ||
+    extractField(html, 'Rasmiy nomi')
+  const shortName =
+    extractField(html, 'Краткое название организации') ||
+    extractField(html, 'Qisqa nomi')
+
   return {
     tin,
-    officialName: extractField(html, 'Официальное название организации'),
-    shortName: extractField(html, 'Краткое название организации'),
+    officialName,
+    shortName,
     registeredDate: extractField(html, "Ro'yxatdan o'tgan sana"),
     status: extractField(html, 'Faollik holati'),
     registeringAuthority: extractField(html, "Ro'yxatdan o'tkazuvchi organ"),

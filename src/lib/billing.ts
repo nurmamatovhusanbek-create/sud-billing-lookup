@@ -336,10 +336,10 @@ export interface CheckStatusResponse {
   court: string | null
   courtId: number | null
   courtType: string | null // court type ID: CRIMINAL | CITIZEN | ADMINISTRATIVE | ECONOMIC | MILITARY
-  payCategory: string | null // Russian label, e.g. "Государственная пошлина"
+  payCategory: string | null // Russian label from the API, e.g. "Gosudarstvennaya poshlina"
   payCategoryId: number | null
-  description: string | null // Uzbek label, e.g. "Давлат божи"
-  purpose: string | null // e.g. "За подачу искового заявления"
+  description: string | null // Uzbek label from the API (Cyrillic), e.g. "Davlat boji"
+  purpose: string | null // Russian purpose text from the API, e.g. "Za podachu iskovogo zayavleniya"
   purposeId: number | null
   instance: string | null // e.g. "FIRST"
   payer: string | null
@@ -374,12 +374,16 @@ export interface EnrichedBill extends BillListItem {
  * Source: the `courtTypes` array in billing.sud.uz's JS bundle.
  * Useful for filtering / grouping bills by court type in downstream features.
  */
+// `uz` is Latin-Uzbek (display). `ru` is Russian (kept for reference — the
+// billing.sud.uz JS bundle lists Russian labels). `en` is the English label.
+// The Cyrillic-Uzbek forms that the API sometimes returns are matched in
+// categoryLabel() below, NOT stored here as display labels.
 export const COURT_TYPES: Record<string, { uz: string; ru: string; en: string }> = {
-  CRIMINAL: { uz: 'Жиноят ишлари бўйича суд', ru: 'Суд по уголовным делам', en: 'Criminal court' },
-  CITIZEN: { uz: 'Фуқаролик ишлари бўйича суд', ru: 'Суд по гражданским делам', en: 'Civil court' },
-  ADMINISTRATIVE: { uz: 'Маъмурий суд', ru: 'Административный суд', en: 'Administrative court' },
-  ECONOMIC: { uz: 'Иқтисодий суд', ru: 'Экономический суд', en: 'Economic court' },
-  MILITARY: { uz: 'Харбий суд', ru: 'Военный суд', en: 'Military court' },
+  CRIMINAL: { uz: 'Jinoyat ishlari boyicha sud', ru: 'Sud po ugolovnym delam', en: 'Criminal court' },
+  CITIZEN: { uz: 'Fuqarolik ishlari boyicha sud', ru: 'Sud po grazhdanskim delam', en: 'Civil court' },
+  ADMINISTRATIVE: { uz: "Ma'muriy sud", ru: 'Administrativnyy sud', en: 'Administrative court' },
+  ECONOMIC: { uz: 'Iqtisodiy sud', ru: 'Ekonomicheskiy sud', en: 'Economic court' },
+  MILITARY: { uz: 'Harbiy sud', ru: 'Voennyy sud', en: 'Military court' },
 }
 
 export function courtTypeLabel(type: string | null | undefined): string {

@@ -18,7 +18,7 @@ export interface Jadval2Hearing {
   hearing_date: string    // DD.MM.YYYY
   hearing_time: string    // HH:MM
   responsible: string     // judge name
-  instance: string        // "Биринчи инстанция" etc.
+  instance: string        // "Birinchi instansiya" etc. (Cyrillic in API response)
   globalid: string        // court ID
   claimkind: string       // "SUIT" etc.
   claimtype: string       // "CIVIL", "ECONOMIC", etc.

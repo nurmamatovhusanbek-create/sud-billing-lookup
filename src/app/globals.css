@@ -1481,6 +1481,13 @@
 /* detail-panel (case expand wrapper) */
 .detail-panel { display: flex; flex-direction: column; gap: 16px; }
 .detail-section { display: flex; flex-direction: column; gap: 12px; }
+.detail-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -4px;
+}
 .detail-section-title {
   font-size: 10px;
   font-weight: 700;

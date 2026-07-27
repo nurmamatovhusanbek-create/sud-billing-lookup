@@ -91,12 +91,14 @@ export async function searchCourtCases(
     const normalized = single.endsWith('/') ? single : single + '/'
     if (!cfWorkerUrls.includes(normalized)) cfWorkerUrls.push(normalized)
   }
+  // Use FALLBACK_WORKERS if env is empty (prevents "via direct" when .env is lost)
+  const allWorkers = cfWorkerUrls.length > 0 ? cfWorkerUrls : FALLBACK_WORKERS
 
   /** Wrap a jadval/jadvalapi URL with a CF Worker (round-robin). */
   let courtRequestCounter = 0
   function proxyCourtUrl(url: string): string {
-    if (cfWorkerUrls.length === 0) return url // no workers — try direct
-    const worker = cfWorkerUrls[courtRequestCounter % cfWorkerUrls.length]
+    if (allWorkers.length === 0) return url
+    const worker = allWorkers[courtRequestCounter % allWorkers.length]
     courtRequestCounter++
     return worker + url
   }
@@ -130,10 +132,19 @@ export async function searchCourtCases(
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         console.error(`[court-case] ${url} attempt ${attempt + 1} failed: ${msg}`)
-        // Only retry on 521 (origin temporarily down) — NOT on timeouts or connection errors.
-        // Timeouts mean the origin is slow/unresponsive; retrying just wastes another 8s.
-        if (attempt === 0 && msg.includes('521')) {
-          await new Promise((r) => setTimeout(r, 500))
+        // Retry on transient errors: 521 (origin down), connection errors, timeouts.
+        // These are often temporary — the server blips for a few seconds then recovers.
+        // A single retry with a short delay catches most of these.
+        const isTransient = msg.includes('521') ||
+          msg.includes('Unable to connect') ||
+          msg.includes('fetch failed') ||
+          msg.includes('ECONNREFUSED') ||
+          msg.includes('ENOTFOUND') ||
+          msg.includes('typo in the url') ||
+          msg.includes('aborted')
+        if (attempt === 0 && isTransient) {
+          console.log(`[court-case] retrying ${url} (transient error) in 1s...`)
+          await new Promise((r) => setTimeout(r, 1000))
           continue
         }
         return []
@@ -380,8 +391,57 @@ export async function getCaseDetails(
       } : null,
       documents: [],
     },
-    appellate: null,
-    cassation: null,
+    appellate: parseReviewInstance(raw, 'апелляция'),
+    cassation: parseReviewInstance(raw, 'кассация'),
+  }
+}
+
+/**
+ * Parse a review entry from the API response as an appeal or cassation instance.
+ * The jadvalapi findByNumber response includes a `reviews` array that contains
+ * appeal/cassation instances. Each review has an `instance` field whose value
+ * is the Cyrillic-Uzbek phrase "Apellyatsiya instansiyasi" or "Kassatsiya
+ * instansiyasi" (written in Cyrillic in the API response). We match on the
+ * Cyrillic lowercase fragments "apellyatsiya" / "kassatsiya" — those are the
+ * only forms the API ever emits, so no Latin fallback is needed here.
+ */
+function parseReviewInstance(raw: any, type: 'апелляция' | 'кассация'): InstanceData | null {
+  const reviews = raw?.reviews
+  if (!Array.isArray(reviews) || reviews.length === 0) return null
+
+  // Find the review matching this instance type
+  const review = reviews.find((r: any) => {
+    const inst = (r.instance || '').toLowerCase()
+    return inst.includes(type)
+  })
+  if (!review) return null
+
+  const reviewHearings = [
+    {
+      date: review.hearing_date || '—',
+      time: review.hearing_time || '—',
+      status: review.status_name || review.instance || '—',
+      postponementReason: review.postpone_reason || '',
+      courtroom: review.courtroom || '',
+      judge: review.responsible || '—',
+    },
+  ]
+
+  const reviewDecision = review.result && review.result !== '—' ? {
+    date: review.reg_date || '—',
+    text: review.result || '—',
+    type: review.result || '—',
+    awardedAmount: '—',
+    stateDutyRecovered: '—',
+    enforcedDate: '—',
+    appealDeadline: '—',
+  } : null
+
+  return {
+    hearings: reviewHearings,
+    decision: reviewDecision,
+    documents: [],
+    appellant: review.claiment || review.claimant || undefined,
   }
 }
 

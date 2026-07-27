@@ -168,8 +168,15 @@ function CategoryBadge({
 }
 
 // ---- Case status + hearing status badges (monochrome) ----------------
+// The KEYS are Cyrillic because that's what the sud.uz APIs return in their
+// `status_name` / `instance` fields. Latin-Uzbek keys are ALSO included so
+// synthetic Latin status strings (e.g. the ones we set in StatsTab →
+// CourtCase conversion) resolve to the right tone. Display always goes
+// through CASE_STATUSES[status]?.en / HEARING_STATUSES[status]?.en which is
+// Latin — never the raw Cyrillic key.
 
 const CASE_STATUS_TONES: Record<string, string> = {
+  // Cyrillic keys — match API responses
   'Иш юритувда':       'b-unpaid',
   'Кўриб чиқилмоқда':  'b-unpaid',
   'Тугатилган':        'b-paid',
@@ -179,14 +186,31 @@ const CASE_STATUS_TONES: Record<string, string> = {
   'Кассацияда':        'b-unpaid',
   'Назоратда':         'b-unpaid',
   'Ижро этилмоқда':    'b-paid',
+  // Latin keys — match synthetic / Latin API responses
+  'Ish yurituvda':       'b-unpaid',
+  "Ko'rib chiqilmoqda":  'b-unpaid',
+  'Tugatilgan':          'b-paid',
+  "To'xtatilgan":        'b-unpaid',
+  'Bekor qilingan':      'b-unpaid',
+  'Apellyatsiyada':      'b-unpaid',
+  'Kassatsiyada':        'b-unpaid',
+  'Nazoratda':           'b-unpaid',
+  'Ijro etilmoqda':      'b-paid',
 }
 
 const HEARING_STATUS_TONES: Record<string, string> = {
+  // Cyrillic keys — match API responses
   'Тайинланган':    'b-unpaid',
   'Кечиктирилган':  'b-unpaid',
   'Ўтказилган':     'b-paid',
   'Бекор қилинган': 'b-unpaid',
   'Якунланган':     'b-paid',
+  // Latin keys — match synthetic / Latin API responses
+  'Tayinlangan':    'b-unpaid',
+  'Kechiktirilgan': 'b-unpaid',
+  "O'tkazilgan":    'b-paid',
+  'Bekor qilingan': 'b-unpaid',
+  'Yakunlangan':    'b-paid',
 }
 
 function CaseStatusBadge({ status }: { status: string | null | undefined }) {
@@ -1173,8 +1197,220 @@ function CaseDetailView({
   if (!data) return null
   const g = data.general
 
+  // ---- High-res PDF export (browser print engine) -----------------------
+  // Opens a new window with a print-optimised HTML view of the full case
+  // (general info + first instance + appellate + cassation). The user then
+  // picks "Save as PDF" in the browser print dialog — this gives the highest
+  // resolution output (vector text, no canvas rasterisation) with zero
+  // client-side PDF libraries (no jspdf / html2canvas / puppeteer needed).
+  const handlePrintPDF = () => {
+    if (!data) return
+    const esc = (s: string | null | undefined) =>
+      (s == null ? '' : String(s))
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    const val = (s: string | null | undefined) =>
+      s && s !== '—' ? s : ''
+    const statusLabel = (s: string | null | undefined) => {
+      if (!s) return ''
+      return CASE_STATUSES[s]?.en ?? s
+    }
+    const hearingLabel = (s: string | null | undefined) => {
+      if (!s) return ''
+      return HEARING_STATUSES[s]?.en ?? s
+    }
+    const row = (label: string, value: string | null | undefined, mono = false) => {
+      const v = val(value)
+      if (!v) return ''
+      return `<div class="info-row"><span class="lbl">${esc(label)}</span><div class="val${mono ? ' mono' : ''}">${esc(v)}</div></div>`
+    }
+
+    const renderInstance = (title: string, inst: InstanceData | null): string => {
+      if (!inst) return ''
+      const hearings = inst.hearings ?? []
+      const decision = inst.decision
+      const hasMeta = !!(inst.appellant || inst.appealFiledDate || inst.appellateCourt || inst.appellateOutcome)
+      if (hearings.length === 0 && !decision && !hasMeta) return ''
+
+      let html = `<h2>${esc(title)}</h2>`
+
+      if (hasMeta) {
+        html += '<div class="meta-block">'
+        if (inst.appellant) html += `<div><span class="lbl">Apellyatsiya beruvchi</span><div class="val">${esc(inst.appellant)}</div></div>`
+        if (inst.appealFiledDate) html += `<div><span class="lbl">Berilgan sana</span><div class="val mono">${esc(inst.appealFiledDate)}</div></div>`
+        if (inst.appellateCourt) html += `<div><span class="lbl">Apellyatsiya sudi</span><div class="val">${esc(inst.appellateCourt)}</div></div>`
+        if (inst.appellateOutcome) html += `<div><span class="lbl">Natija</span><div class="val">${esc(inst.appellateOutcome)}</div></div>`
+        html += '</div>'
+      }
+
+      if (hearings.length > 0) {
+        html += `<h3>Majlislar tarixi (${hearings.length})</h3><div class="timeline">`
+        for (const h of hearings) {
+          html += `<div class="ti">
+            <div class="when">${esc(h.date)}${h.time && h.time !== '—' ? ' · ' + esc(h.time) : ''}</div>
+            <div class="status">${esc(hearingLabel(h.status))}</div>
+            ${h.courtroom && h.courtroom !== '—' ? `<div class="meta">Sud zali: ${esc(h.courtroom)}</div>` : ''}
+            ${h.judge && h.judge !== '—' ? `<div class="meta">Sudya: ${esc(h.judge)}</div>` : ''}
+            ${h.postponementReason ? `<div class="meta">Kechiktirildi: ${esc(h.postponementReason)}</div>` : ''}
+          </div>`
+        }
+        html += '</div>'
+      }
+
+      if (decision) {
+        html += '<div class="decision">'
+        html += `<div class="decision-title">Qaror: ${esc(decision.type || '—')}</div>`
+        if (decision.date) {
+          let dateLine = `Sana: ${esc(decision.date)}`
+          if (decision.enforcedDate && decision.enforcedDate !== '—') dateLine += ` · Ijro: ${esc(decision.enforcedDate)}`
+          html += `<div class="meta">${dateLine}</div>`
+        }
+        if (decision.text && decision.text !== '—') {
+          html += `<div class="decision-text">${esc(decision.text)}</div>`
+        }
+        if (decision.awardedAmount && decision.awardedAmount !== '—') {
+          html += `<div class="meta">Undirilgan summa: <strong class="mono">${esc(decision.awardedAmount)}</strong></div>`
+        }
+        if (decision.stateDutyRecovered && decision.stateDutyRecovered !== '—') {
+          html += `<div class="meta">Qaytarilgan davlat boji: <span class="mono">${esc(decision.stateDutyRecovered)}</span></div>`
+        }
+        if (decision.appealDeadline && decision.appealDeadline !== '—') {
+          html += `<div class="meta">Apellyatsiya muddati: <span class="mono">${esc(decision.appealDeadline)}</span></div>`
+        }
+        html += '</div>'
+      }
+
+      return html
+    }
+
+    const generalRows = [
+      row('Sud', g?.court),
+      row('Ish raqami', g?.caseNumber, true),
+      row('Ish turi', g?.caseType),
+      row('Ish holati', statusLabel(g?.caseStatus)),
+      row('Sudya', g?.judge),
+      row('Kotib', g?.secretary),
+      row("Da'vogar", g?.plaintiff),
+      row("Da'vogar STIR", plaintiffTin || (g?.plaintiffTin && g.plaintiffTin !== '—' ? g.plaintiffTin : ''), true),
+      row('Javobgar', g?.defendant),
+      row('Javobgar STIR', defendantTin || (g?.defendantTin && g.defendantTin !== '—' ? g.defendantTin : ''), true),
+      row("Da'vo predmeti", g?.claimSubject),
+      row("Da'vo summasi", g?.claimAmount, true),
+      row('Davlat boji', g?.stateDuty, true),
+      row('Uchinchi shaxs', g?.thirdParty),
+      row('Vakil', g?.representative),
+      row('Prokuror', g?.prosecutor),
+      row('Ariza berilgan sana', g?.applicationDate, true),
+      row('Boshlangan sana', g?.initiatedDate, true),
+      row('Muddat sanasi', g?.deadlineDate, true),
+    ].join('')
+
+    const now = new Date().toLocaleString('uz-UZ', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+    })
+
+    const html = `<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(g?.caseNumber || 'Ish')} — Sud Billing Lookup</title>
+<style>
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    padding: 40px;
+    color: #111;
+    max-width: 900px;
+    margin: 0 auto;
+    line-height: 1.5;
+    font-size: 13px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 28px 0 12px; border-bottom: 2px solid #111; padding-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  h3 { font-size: 11px; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; color: #444; }
+  .subtitle { color: #555; font-size: 12px; margin-bottom: 20px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #ddd; border: 1px solid #ddd; }
+  .info-row { background: #fff; padding: 8px 10px; }
+  .lbl { font-size: 8px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 0.6px; display: block; margin-bottom: 2px; }
+  .val { font-size: 12px; font-weight: 500; word-break: break-word; }
+  .mono { font-family: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace; }
+  .timeline { margin: 8px 0; }
+  .ti { padding: 8px 12px; border-left: 3px solid #111; margin-bottom: 6px; background: #f7f7f7; }
+  .when { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+  .status { font-size: 11px; color: #444; margin-bottom: 2px; font-weight: 600; }
+  .meta { font-size: 11px; color: #555; }
+  .decision { padding: 12px 14px; background: #f0f0f0; border-left: 3px solid #111; margin: 12px 0; }
+  .decision-title { font-weight: 700; font-size: 12px; margin-bottom: 4px; }
+  .decision-text { font-size: 11px; margin-top: 6px; }
+  .meta-block { padding: 10px 12px; background: #f7f7f7; margin: 8px 0; border: 1px solid #e5e5e5; }
+  .meta-block div { margin: 4px 0; }
+  .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 10px; color: #888; text-align: center; }
+  .print-btn {
+    position: fixed; top: 16px; right: 16px;
+    padding: 10px 18px; background: #111; color: #fff;
+    border: none; cursor: pointer; font-size: 13px; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .print-btn:hover { background: #333; }
+  @media print {
+    body { padding: 0; max-width: none; font-size: 11px; }
+    .no-print { display: none !important; }
+    h2 { page-break-after: avoid; }
+    .ti, .decision { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <button class="print-btn no-print" onclick="window.print()">PDF sifatida saqlash</button>
+  <h1>${esc(g?.caseNumber || 'Ish')}</h1>
+  <div class="subtitle">${esc(g?.court || '—')}${g?.caseStatus ? ' · ' + esc(statusLabel(g.caseStatus)) : ''}</div>
+  ${generalRows ? `<h2>Umumiy ma'lumotlar</h2><div class="info-grid">${generalRows}</div>` : ''}
+  ${renderInstance('Birinchi instansiya', data.firstInstance)}
+  ${renderInstance('Apellyatsiya', data.appellate)}
+  ${renderInstance('Kassatsiya', data.cassation)}
+  <div class="footer">
+    Sud Billing Lookup tomonidan yaratilgan · ${esc(now)} · ${esc(g?.caseNumber || '')}
+  </div>
+  <script>
+    // Auto-trigger the print dialog once the document is fully rendered.
+    // A short delay ensures fonts/styles are applied before printing.
+    window.addEventListener('load', function() {
+      setTimeout(function() { window.print(); }, 400);
+    });
+  </script>
+</body>
+</html>`
+
+    const printWindow = window.open('', '_blank', 'width=1000,height=720')
+    if (!printWindow) {
+      toast.error("PDF oynasini ochib bo'lmadi — brauzer pop-up'larni bloklamoqda")
+      return
+    }
+    printWindow.document.open()
+    printWindow.document.write(html)
+    printWindow.document.close()
+  }
+
   return (
     <div className="detail-panel">
+      {/* PDF / print export toolbar */}
+      <div className="detail-toolbar">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={handlePrintPDF}
+          aria-label="Ish tafsilotlarini PDF sifatida yuklab olish"
+          title="PDF sifatida saqlash"
+        >
+          <FileText className="w-3 h-3" />
+          <span>PDF</span>
+        </button>
+      </div>
       {/* General info — definition list panel */}
       <div className="detail-section">
         <p className="detail-section-title">
@@ -2901,7 +3137,9 @@ function StatsTab({
       caseNumber: c.caseNumber,
       caseType: c.category || '',
       // We don't have a real caseStatus here — derive from classification.
-      caseStatus: c.classification === 'pending' ? 'Иш юритувда' : 'Тугатилган',
+      // Use Latin-Uzbek strings so the badge lookup resolves to the correct
+      // tone + label without leaking Cyrillic into the UI.
+      caseStatus: c.classification === 'pending' ? 'Ish yurituvda' : 'Tugatilgan',
       result: c.result || '',
       courtName: c.court || '',
       dateFiled: c.regDate || '',
@@ -4142,7 +4380,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v128</p>
+                <p className="brand-sub">v131</p>
               </div>
             </div>
             <div className="header-right">
@@ -4585,9 +4823,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v128">
+        <footer className="app-footer" data-version="v131">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v128</div>
+            <div className="footer-text">Sud Billing Lookup v131</div>
           </div>
         </footer>
       </div>

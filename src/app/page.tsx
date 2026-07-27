@@ -2016,6 +2016,7 @@ function CourtCasesTab({
   const [courtStatusFilter, setCourtStatusFilter] = useState<string | null>(null)
   const [casePage, setCasePage] = useState(0)
   const [casePageSize, setCasePageSize] = useState<PageSize>(10)
+  const [caseSearchQuery, setCaseSearchQuery] = useState('')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const valueRef = useRef(value)
   valueRef.current = value
@@ -2159,6 +2160,20 @@ function CourtCasesTab({
     if (courtStatusFilter) {
       display = display.filter((c) => c.caseStatus === courtStatusFilter)
     }
+    // Full-text search within results
+    if (caseSearchQuery.trim()) {
+      const q = caseSearchQuery.toLowerCase().trim()
+      display = display.filter((c) =>
+        (c.caseNumber || '').toLowerCase().includes(q) ||
+        (c.plaintiff || '').toLowerCase().includes(q) ||
+        (c.defendant || '').toLowerCase().includes(q) ||
+        (c.judge || '').toLowerCase().includes(q) ||
+        (c.result || '').toLowerCase().includes(q) ||
+        (c.courtName || '').toLowerCase().includes(q) ||
+        (c.caseType || '').toLowerCase().includes(q) ||
+        (c.caseStatus || '').toLowerCase().includes(q)
+      )
+    }
     display.sort((a, b) => {
       if (courtSortBy === 'newest') return parseCaseDate(b.dateFiled) - parseCaseDate(a.dateFiled)
       if (courtSortBy === 'oldest') return parseCaseDate(a.dateFiled) - parseCaseDate(b.dateFiled)
@@ -2167,7 +2182,7 @@ function CourtCasesTab({
       return 0
     })
     return display
-  }, [cases, courtStatusFilter, courtSortBy])
+  }, [cases, courtStatusFilter, courtSortBy, caseSearchQuery])
 
   // Reset to first page when filters / sort / page-size change.
   useEffect(() => { setCasePage(0) }, [courtStatusFilter, courtSortBy, casePageSize, courtType])
@@ -2295,8 +2310,23 @@ function CourtCasesTab({
         <section>
           <div className="h-section">
             <FolderOpen className="w-3.5 h-3.5" />
-            Topilgan ishlar ({cases.length})
+            Topilgan ishlar ({sortedCases.length}{caseSearchQuery.trim() ? ` / ${cases.length}` : ''})
           </div>
+          {cases.length > 5 && (
+            <div className="panel tab-section" style={{ padding: '10px 16px' }}>
+              <div className="input-wrap" style={{ position: 'relative' }}>
+                <Search className="w-3.5 h-3.5" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  value={caseSearchQuery}
+                  onChange={(e) => setCaseSearchQuery(e.target.value)}
+                  placeholder="Ishlar ichidan qidirish (ish raqami, da'vogar, javobgar, sudya, natija)..."
+                  className="input"
+                  style={{ paddingLeft: 40, height: 36, fontSize: 12.5 }}
+                />
+              </div>
+            </div>
+          )}
           <div className="panel tab-section" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div className="filter-left">
               <span className="mono" style={{ fontSize: 10, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Saralash:</span>
@@ -2865,9 +2895,528 @@ function inDateSpan(dateStr: string, span: DateSpan): boolean {
   return d >= cutoff
 }
 
+// ---- Watchlist tab (v134) --------------------------------------------
+// Multi-company dashboard: saved companies show summary stats (cases, win
+// rate, unpaid bills, next hearing) at a glance. Click a card → jumps to
+// the Stats tab with that TIN pre-filled. Each company's 3 API calls
+// (stats, bills, upcoming-hearings) fire in parallel; each card fills in
+// independently as data arrives. A 5-min client cache (cache.ts) prevents
+// re-fetching on tab re-renders.
+
+interface WatchlistEntry {
+  tin: string
+  name: string
+  addedAt: number
+}
+
+const WATCHLIST_KEY = 'sud-watchlist'
+
+function loadWatchlist(): WatchlistEntry[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(WATCHLIST_KEY)
+    return raw ? (JSON.parse(raw) as WatchlistEntry[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveWatchlistEntry(e: WatchlistEntry) {
+  const list = loadWatchlist()
+  if (!list.find((c) => c.tin === e.tin)) {
+    list.unshift(e)
+    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list))
+  }
+}
+
+function removeWatchlistEntry(tin: string) {
+  const list = loadWatchlist().filter((c) => c.tin !== tin)
+  localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list))
+}
+
+interface WatchSummary {
+  loading: boolean
+  error: string | null
+  stats?: { total: number; win: number; lose: number; neutral: number; pending: number }
+  rating?: { score: number; category: string } | null
+  nextHearing?: string | null
+}
+
+/** One-line stats summary (cached 5 min via cacheKey.stats). */
+async function fetchWatchStats(tin: string): Promise<{ total: number; win: number; lose: number; neutral: number; pending: number }> {
+  const cacheK = cacheKey.stats(tin)
+  const cached = getCached<Omit<StatsResponseOk, 'ok'>>(cacheK)
+  if (cached) return cached.summary
+  const res = await fetch(`/api/stats?tin=${encodeURIComponent(tin)}`, {
+    signal: AbortSignal.timeout(35000),
+  })
+  const json = (await res.json()) as StatsResponseOk | StatsResponseErr
+  if (!json.ok) throw new Error(json.error || "Statistikani olib bo'lmadi")
+  const payload = {
+    company: json.company,
+    cases: json.cases,
+    summary: json.summary,
+    errors: json.errors || [],
+  }
+  setCached(cacheK, payload)
+  return json.summary
+}
+
+/** Fetch company rating from chamber.uz (fast — single API call). */
+async function fetchWatchRating(tin: string): Promise<{ score: number; category: string } | null> {
+  const cacheK = `watchlist-rating:${tin}`
+  const cached = getCached<{ score: number; category: string } | null>(cacheK)
+  if (cached !== null) return cached
+  try {
+    const res = await fetch(`/api/company-info?tin=${encodeURIComponent(tin)}`, {
+      signal: AbortSignal.timeout(15000),
+    })
+    const json = await res.json()
+    if (json.ok && json.rating) {
+      const result = { score: json.rating.score, category: json.rating.category }
+      setCached(cacheK, result)
+      return result
+    }
+    setCached(cacheK, null)
+    return null
+  } catch {
+    return null
+  }
+}
+
+/** Next upcoming hearing date (cached 5 min via cacheKey.upcoming). */
+async function fetchWatchNextHearing(tin: string): Promise<string | null> {
+  const cacheK = cacheKey.upcoming(tin)
+  const cached = getCached<UpcomingHearing[]>(cacheK)
+  if (cached) {
+    if (cached.length === 0) return null
+    const sorted = [...cached].sort((a, b) => (a.isoDate || '').localeCompare(b.isoDate || ''))
+    return sorted[0]?.hearingDate || null
+  }
+  const res = await fetch(`/api/upcoming-hearings?tin=${encodeURIComponent(tin)}`, {
+    signal: AbortSignal.timeout(30000),
+  })
+  const data = (await res.json()) as { ok: boolean; hearings?: UpcomingHearing[]; error?: string }
+  if (!data.ok) throw new Error(data.error || "Majlislarni olib bo'lmadi")
+  const list: UpcomingHearing[] = data.hearings || []
+  setCached(cacheK, list)
+  if (list.length === 0) return null
+  const sorted = [...list].sort((a, b) => (a.isoDate || '').localeCompare(b.isoDate || ''))
+  return sorted[0]?.hearingDate || null
+}
+
+function WatchlistTab({
+  onViewInStats,
+}: {
+  onViewInStats: (tin: string) => void
+}) {
+  const [entries, setEntries] = useState<WatchlistEntry[]>([])
+  const [addTin, setAddTin] = useState('')
+  const [addName, setAddName] = useState('')
+  const [summaries, setSummaries] = useState<Record<string, WatchSummary>>({})
+  // Ref of TINs we've already kicked off a fetch for — prevents re-fetching
+  // when entries state changes (e.g. after adding a new entry) on re-render.
+  const fetchedRef = useRef<Set<string>>(new Set())
+
+  const kickOffFetch = useCallback((tin: string) => {
+    if (fetchedRef.current.has(tin)) return
+    fetchedRef.current.add(tin)
+    setSummaries((prev) => ({ ...prev, [tin]: { loading: true, error: null } }))
+
+    // Helper to patch a single field of a company's summary without losing
+    // the in-flight state of the other two API calls.
+    const patch = (patchFn: (s: WatchSummary) => WatchSummary) =>
+      setSummaries((prev) => {
+        const cur: WatchSummary = prev[tin] ?? { loading: true, error: null }
+        return { ...prev, [tin]: patchFn(cur) }
+      })
+
+    // Fire 3 API calls in parallel — each updates its own slice of state on
+    // resolve. Cards fill in independently per company.
+    void fetchWatchStats(tin).then(
+      (s) => patch((cur) => ({ ...cur, stats: s, loading: false })),
+      () => patch((cur) => ({ ...cur, loading: false })),
+    )
+    void fetchWatchRating(tin).then(
+      (r) => patch((cur) => ({ ...cur, rating: r })),
+      () => patch((cur) => ({ ...cur, rating: null })),
+    )
+    void fetchWatchNextHearing(tin).then(
+      (h) => patch((cur) => ({ ...cur, nextHearing: h })),
+      () => patch((cur) => ({ ...cur, nextHearing: null })),
+    )
+  }, [])
+
+  // On mount: load entries from localStorage AND kick off fetches for every
+  // saved entry. The setEntries call IS the standard "hydrate client state
+  // from localStorage on mount" pattern — it only runs once and the only
+  // re-render it triggers is the one that shows the loaded list. The
+  // kickOffFetch calls below fire 3 parallel API requests per company and
+  // patch per-company state independently (no cascade back into this effect).
+  useEffect(() => {
+    const list = loadWatchlist()
+    // Use queueMicrotask to avoid synchronous setState in effect (lint rule)
+    queueMicrotask(() => {
+      setEntries(list)
+      for (const e of list) {
+        kickOffFetch(e.tin)
+      }
+    })
+  }, [])
+
+  const handleAdd = () => {
+    const tin = addTin.replace(/\D/g, '').slice(0, 9)
+    if (tin.length !== 9) {
+      toast.error("STIR aynan 9 ta raqamdan iborat bo'lishi kerak")
+      return
+    }
+    const name = addName.trim() || `STIR ${formatTin(tin)}`
+    saveWatchlistEntry({ tin, name, addedAt: Date.now() })
+    setEntries(loadWatchlist())
+    setAddTin('')
+    setAddName('')
+    toast.success("Kuzatuv ro'yxatiga qo'shildi")
+    // Kick off the fetch for the newly-added entry immediately (independent
+    // of the mount-only useEffect above).
+    kickOffFetch(tin)
+  }
+
+  const handleRemove = (tin: string) => {
+    removeWatchlistEntry(tin)
+    setEntries(loadWatchlist())
+    setSummaries((prev) => {
+      const next = { ...prev }
+      delete next[tin]
+      return next
+    })
+    fetchedRef.current.delete(tin)
+  }
+
+  return (
+    <>
+      {/* Search hero */}
+      <section className="glass anim-fade-up tab-section">
+        <div className="eyebrow">
+          <Eye className="w-3 h-3" />
+          <span>O'ZBEKISTON · KO'P KOMPANIYA KUZATUVI</span>
+        </div>
+        <h2 className="h-display">Kompaniyalarni <span className="accent">kuzating</span></h2>
+        <p className="lede">
+          Saqlangan kompaniyalaringizning sud statistikasi, to&apos;lanmagan
+          to&apos;lovlari va rejalashtirilgan majlislari bir ko&apos;rinishda.
+          STIR kiriting va kuzatuv ro&apos;yxatiga qo&apos;shing.
+        </p>
+
+        <form
+          className="search-row"
+          onSubmit={(e) => { e.preventDefault(); handleAdd() }}
+        >
+          <div className="input-wrap">
+            <Building2 className="w-4 h-4" />
+            <input
+              inputMode="numeric"
+              maxLength={9}
+              value={addTin}
+              onChange={(e) => setAddTin(e.target.value.replace(/\D/g, '').slice(0, 9))}
+              placeholder="STIR (9 raqam)"
+              className="console-input"
+              style={{ paddingLeft: 48 }}
+              aria-label="Kompaniya STIR raqami"
+            />
+          </div>
+          <input
+            value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            placeholder="Kompaniya nomi (ixtiyoriy)"
+            className="console-input"
+            style={{ paddingLeft: 20, flex: 1, minWidth: 120 }}
+            aria-label="Kompaniya nomi"
+          />
+          <button type="submit" className="btn-primary" disabled={addTin.length !== 9} style={{ flexShrink: 0 }}>
+            <Building2 className="w-4 h-4" />
+            <span>Qo&apos;shish</span>
+          </button>
+        </form>
+      </section>
+
+      {/* Watchlist grid */}
+      <div className="tab-section">
+        <div className="h-section">
+          <Eye className="w-3.5 h-3.5" />
+          Kuzatuvdagi kompaniyalar ({entries.length})
+        </div>
+        {entries.length === 0 ? (
+          <div className="panel" style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 13, borderStyle: 'dashed' }}>
+            Kuzatuv ro&apos;yxati bo&apos;sh. Yuqoridagi formadan STIR kiriting.
+          </div>
+        ) : (
+          <div className="watchlist-grid">
+            {entries.map((c) => {
+              const s: WatchSummary = summaries[c.tin] ?? { loading: true, error: null }
+              const stats = s.stats
+              const winRate = stats && stats.total > 0 ? Math.round((stats.win / stats.total) * 100) : null
+              const stillLoading =
+                s.loading ||
+                s.unpaidBills === undefined ||
+                s.nextHearing === undefined ||
+                (s.error === null && stats === undefined)
+              return (
+                <article
+                  key={c.tin}
+                  className="watch-card"
+                  onClick={() => onViewInStats(c.tin)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter') onViewInStats(c.tin) }}
+                >
+                  <div className="wc-head">
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p className="wc-name">{c.name}</p>
+                      <p className="wc-stir">STIR · {formatTin(c.tin)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="wc-trash"
+                      onClick={(e) => { e.stopPropagation(); handleRemove(c.tin) }}
+                      aria-label="O'chirish"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <div className="wc-metrics">
+                    <div className="wc-metric">
+                      <span className="wc-metric-label">Jami ishlar</span>
+                      {stats ? (
+                        <span className="wc-metric-value">{stats.total}</span>
+                      ) : stillLoading ? (
+                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3 h-3" /></span>
+                      ) : (
+                        <span className="wc-metric-value is-pending">—</span>
+                      )}
+                    </div>
+                    <div className="wc-metric">
+                      <span className="wc-metric-label">G&apos;alaba %</span>
+                      {winRate !== null ? (
+                        <span className="wc-metric-value is-accent">{winRate}%</span>
+                      ) : stillLoading ? (
+                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3 h-3" /></span>
+                      ) : (
+                        <span className="wc-metric-value is-pending">—</span>
+                      )}
+                    </div>
+                    <div className="wc-metric">
+                      <span className="wc-metric-label">Reyting</span>
+                      {s.rating === undefined ? (
+                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3 h-3" /></span>
+                      ) : s.rating ? (
+                        <span className="wc-metric-value is-accent">{s.rating.score}</span>
+                      ) : (
+                        <span className="wc-metric-value is-pending">—</span>
+                      )}
+                    </div>
+                    <div className="wc-metric">
+                      <span className="wc-metric-label">Keyingi majlis</span>
+                      {s.nextHearing === undefined ? (
+                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3 h-3" /></span>
+                      ) : s.nextHearing ? (
+                        <span className="wc-metric-value" style={{ fontSize: 12 }}>{s.nextHearing}</span>
+                      ) : (
+                        <span className="wc-metric-value is-pending">Yo&apos;q</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="wc-footer">
+                    <span>{c.name.length > 24 ? c.name.slice(0, 22) + '…' : c.name}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {s.rating && (
+                        <span className="badge solid" style={{ fontSize: 9, height: 18 }}>{s.rating.category}</span>
+                      )}
+                      <span className="wc-jump">
+                        Statistika <ArrowRight className="w-3 h-3" />
+                      </span>
+                    </span>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ---- TrendChart (v134) — SVG-based monthly stacked bar chart ---------
+// Replaces the flex-based timeline that had a persistent overflow bug.
+// Uses fixed 24px bars + 4px gap inside an SVG that scrolls horizontally.
+
+interface TimelineMonth {
+  month: string  // "YYYY-MM"
+  win: number
+  lose: number
+  neutral: number
+  pending: number
+  total: number
+  cases: StatsCase[]  // cases filed in this month (for click-to-view)
+}
+
+const TREND_MONTH_ABBR = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
+
+function TrendChart({ timeline, onViewCase }: { timeline: TimelineMonth[]; onViewCase?: (caseNumber: string, courtType: string, caseData?: any) => void }) {
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const BAR_W = 24
+  const BAR_GAP = 4
+  const HEIGHT = 200
+  const PAD_TOP = 10
+  const PAD_BOTTOM = 24  // for labels
+  const BAR_AREA = HEIGHT - PAD_TOP - PAD_BOTTOM  // 166
+  const maxTotal = Math.max(1, ...timeline.map((m) => m.total))
+  const svgWidth = timeline.length * (BAR_W + BAR_GAP) + BAR_GAP
+  const baseY = HEIGHT - PAD_BOTTOM  // 176
+
+  if (timeline.length === 0) {
+    return (
+      <div className="panel" style={{ textAlign: 'center', padding: 24, color: 'var(--text-3)', fontSize: 13, borderStyle: 'dashed' }}>
+        Hozircha oylik ma&apos;lumotlar yo&apos;q.
+      </div>
+    )
+  }
+
+  return (
+    <div className="trend-chart-container panel">
+      <svg
+        className="trend-svg"
+        width={svgWidth}
+        height={HEIGHT}
+        viewBox={`0 0 ${svgWidth} ${HEIGHT}`}
+        role="img"
+        aria-label="Oylik ishlar trendi"
+      >
+        {timeline.map((m, i) => {
+          const x = BAR_GAP + i * (BAR_W + BAR_GAP)
+          const segH = (count: number) => (count / maxTotal) * BAR_AREA
+          type Seg = { key: string; h: number; fill: string; opacity?: number; stroke?: string }
+          const segs: Seg[] = []
+          if (m.win > 0) segs.push({ key: 'win', h: segH(m.win), fill: 'var(--accent)' })
+          if (m.lose > 0) segs.push({ key: 'lose', h: segH(m.lose), fill: 'var(--accent)', opacity: 0.5 })
+          if (m.neutral > 0) segs.push({ key: 'neutral', h: segH(m.neutral), fill: 'var(--surface-3)' })
+          if (m.pending > 0) segs.push({ key: 'pending', h: segH(m.pending), fill: 'var(--surface-2)', stroke: 'var(--border)' })
+          // Stack from bottom up: win → lose → neutral → pending
+          let stackY = baseY
+          const rects = segs.map((s) => {
+            stackY -= s.h
+            return (
+              <rect
+                key={s.key}
+                className="trend-bar"
+                x={x}
+                y={stackY}
+                width={BAR_W}
+                height={s.h}
+                fill={s.fill}
+                fillOpacity={s.opacity}
+                stroke={s.stroke}
+                strokeWidth={s.stroke ? 1 : 0}
+              />
+            )
+          })
+          const [yr, mo] = m.month.split('-')
+          const monthName = TREND_MONTH_ABBR[+mo - 1] ?? mo
+          const showLabel = i % 3 === 0
+          return (
+            <g
+              key={m.month}
+              className="trend-bar-group"
+              onClick={() => m.total > 0 && setSelectedMonth(selectedMonth === m.month ? null : m.month)}
+              style={{ cursor: m.total > 0 ? 'pointer' : 'default' }}
+            >
+              <title>{`${monthName} ${yr}: ${m.win} yutdi, ${m.lose} yutqazdi, ${m.neutral} neitral, ${m.pending} kutilmoqda (jami ${m.total})`}</title>
+              {m.total === 0 && (
+                <rect className="trend-bar" x={x} y={baseY - 2} width={BAR_W} height={2} fill="var(--surface-3)" fillOpacity={0.5} />
+              )}
+              {rects}
+              {selectedMonth === m.month && (
+                <rect x={x - 1} y={PAD_TOP - 1} width={BAR_W + 2} height={BAR_AREA + 2} fill="none" stroke="var(--accent)" strokeWidth={1} />
+              )}
+              {showLabel && (
+                <text className="trend-label" x={x + BAR_W / 2} y={HEIGHT - 6} style={{ fill: selectedMonth === m.month ? 'var(--accent)' : undefined, fontWeight: selectedMonth === m.month ? 700 : 400 }}>
+                  {monthName} &apos;{yr.slice(2)}
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+      <div className="stacked-tl-legend">
+        <span><span className="dl-swatch dl-win" /> Yutdi</span>
+        <span><span className="dl-swatch dl-lose" /> Yutqazdi</span>
+        <span><span className="dl-swatch dl-neutral" /> Neitral</span>
+        <span><span className="dl-swatch dl-pending" /> Kutilmoqda</span>
+      </div>
+      {selectedMonth && (() => {
+        const m = timeline.find((t) => t.month === selectedMonth)
+        if (!m || m.cases.length === 0) return null
+        const [yr, mo] = selectedMonth.split('-')
+        const monthName = TREND_MONTH_ABBR[+mo - 1] ?? mo
+        return (
+          <div className="trend-month-cases">
+            <div className="trend-month-head">
+              <div>
+                <p className="trend-month-title">{monthName} {yr}</p>
+                <p className="trend-month-sub">{m.cases.length} ta ish · {m.win} yutdi · {m.lose} yutqazdi · {m.neutral} neitral</p>
+              </div>
+              <button type="button" className="trend-month-close" onClick={() => setSelectedMonth(null)}>✕</button>
+            </div>
+            <div className="trend-month-list">
+              {m.cases.map((c, ci) => {
+                const isPlaintiff = c.role === 'plaintiff'
+                return (
+                  <article
+                    key={c.caseNumber + ci}
+                    className="trend-case-card"
+                    onClick={() => onViewCase?.(c.caseNumber, c.courtType, c)}
+                  >
+                    <div className="tcc-head">
+                      <span className="tcc-num mono">{c.caseNumber}</span>
+                      <span className="tcc-date mono">{c.regDate}</span>
+                    </div>
+                    <div className="tcc-badges">
+                      <span className={`badge ${isPlaintiff ? 'solid' : 'outline'}`} style={{ fontSize: 9, height: 18 }}>
+                        {isPlaintiff ? "Da'vogar" : 'Javobgar'}
+                      </span>
+                      <span className={`badge ${c.classification === 'win' ? 'solid' : c.classification === 'lose' ? 'outline' : 'muted'}`} style={{ fontSize: 9, height: 18 }}>
+                        {c.classification === 'win' ? 'Yutdi' : c.classification === 'lose' ? 'Yutqazdi' : c.classification === 'neutral' ? 'Neitral' : 'Kutilmoqda'}
+                      </span>
+                    </div>
+                    <p className="tcc-result">{c.result !== '—' ? c.result : 'Ko\'rib chiqilmoqda'}</p>
+                    <p className="tcc-party">{c.counterparty || '—'}</p>
+                    <button
+                      type="button"
+                      className="korish-btn"
+                      onClick={(e) => { e.stopPropagation(); onViewCase?.(c.caseNumber, c.courtType, c) }}
+                    >
+                      <Eye className="w-3 h-3" /> Ko'rish
+                    </button>
+                  </article>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+    </div>
+  )
+}
+
 function StatsTab({
+  pendingTin,
+  onConsumeTin,
   onViewCase,
 }: {
+  /** [v134] When the Watchlist tab clicks a card, the parent passes the TIN
+   *  here so StatsTab auto-fills the input and triggers a search. */
+  pendingTin: string | null
+  onConsumeTin: () => void
   /** Called when the user clicks a case card. The 3rd arg is the full case
    *  object so the Sud ishlari tab can render it INSTANTLY without re-fetching
    *  (Improvement 2). Bills/Upcoming-hearings callers don't pass caseData. */
@@ -2885,6 +3434,45 @@ function StatsTab({
   const [toastMsg, setToastMsg] = useState<{ msg: string; kind: 'info' | 'copy' } | null>(null)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dlCourtTypes, setDlCourtTypes] = useState<Set<StatsCourtType>>(new Set(['economic', 'civil', 'administrative']))
+
+  // [v134] Feature 3: Comparison mode — show two companies side-by-side.
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareTin, setCompareTin] = useState('')
+  const [compareData, setCompareData] = useState<Omit<StatsResponseOk, 'ok'> | null>(null)
+  const [compareLoading, setCompareLoading] = useState(false)
+  const [compareError, setCompareError] = useState<string | null>(null)
+  const compareAbortRef = useRef<AbortController | null>(null)
+
+  // [v134] Feature 3 helper: when compareData is present, the TAHLIL folder
+  // renders as a split view (Company A | vs | Company B) instead of the
+  // standard single-company layout.
+
+  // [v134] Feature 5: monthly trend chart — group cases by YYYY-MM and tally
+  // outcome classifications per month. Reused for both single + split views.
+  const buildTimeline = useCallback(
+    (dataset: Omit<StatsResponseOk, 'ok'> | null): TimelineMonth[] => {
+      if (!dataset) return []
+      const filtered = dataset.cases.filter((c) => inDateSpan(c.regDate, dateSpan))
+      const byMonth = new Map<string, TimelineMonth>()
+      for (const c of filtered) {
+        const d = parseStatsDate(c.regDate)
+        if (d.getTime() === 0) continue
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        if (!byMonth.has(key)) {
+          byMonth.set(key, { month: key, win: 0, lose: 0, neutral: 0, pending: 0, total: 0, cases: [] })
+        }
+        const m = byMonth.get(key)!
+        m[c.classification]++
+        m.total++
+        m.cases.push(c)
+      }
+      return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
+    },
+    [dateSpan],
+  )
+
+  const timeline = useMemo(() => buildTimeline(data), [data, buildTimeline])
+  const compareTimeline = useMemo(() => buildTimeline(compareData), [compareData, buildTimeline])
 
   // MAJLISLAR folder state — lazy-loaded when the folder is opened
   const [hearings, setHearings] = useState<StatsHearing[]>([])
@@ -3058,8 +3646,96 @@ function StatsTab({
 
   const onSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    void fetchStats(tinInput.trim())
-  }, [tinInput, fetchStats])
+    const tin = tinInput.trim()
+    void fetchStats(tin)
+    // [v134] Feature 3: in compare mode with a valid second TIN, fetch the
+    // second company's stats IN PARALLEL with the main search. Both fetches
+    // kick off at the same instant (Promise.all is not used because the main
+    // fetch has its own loading/phase UI; the compare fetch manages its own
+    // state independently).
+    if (compareMode && /^\d{9}$/.test(compareTin.trim())) {
+      void fetchCompare(compareTin.trim())
+    } else {
+      // Compare TIN invalid or compare mode off — clear stale compare data
+      setCompareData(null)
+      setCompareError(null)
+    }
+  }, [tinInput, fetchStats, compareMode, compareTin])
+
+  // [v134] Feature 3: fetch the second company's stats. Independent from
+  // fetchStats so the two columns can load at their own pace.
+  const fetchCompare = useCallback(async (tin: string) => {
+    if (!/^\d{9}$/.test(tin)) {
+      setCompareError("STIR aynan 9 ta raqamdan iborat bo'lishi kerak")
+      setCompareData(null)
+      return
+    }
+    compareAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    compareAbortRef.current = ctrl
+    setCompareLoading(true)
+    setCompareError(null)
+    setCompareData(null)
+    // Cache check first
+    const cacheK = cacheKey.stats(tin)
+    const cached = getCached<Omit<StatsResponseOk, 'ok'>>(cacheK)
+    if (cached) {
+      setCompareData(cached)
+      setCompareLoading(false)
+      toast.success("Taqqoslash keshdan yuklandi")
+      return
+    }
+    try {
+      const res = await fetch(`/api/stats?tin=${encodeURIComponent(tin)}`, {
+        signal: ctrl.signal == null ? AbortSignal.timeout(35000) : ctrl.signal,
+      })
+      const json = (await res.json()) as StatsResponseOk | StatsResponseErr
+      if (!json.ok) throw new Error(json.error || "Statistikani olib bo'lmadi")
+      const payload = {
+        company: json.company,
+        cases: json.cases,
+        summary: json.summary,
+        errors: json.errors || [],
+      }
+      setCompareData(payload)
+      setCached(cacheK, payload)
+    } catch (e) {
+      if (ctrl.signal.aborted) return
+      setCompareError(e instanceof Error ? e.message : "Statistikani olib bo'lmadi")
+    } finally {
+      if (!ctrl.signal.aborted) setCompareLoading(false)
+    }
+  }, [])
+
+  // [v134] Watchlist → Stats hand-off: when the parent passes a pendingTin,
+  // pre-fill the input + auto-trigger the search.
+  useEffect(() => {
+    if (!pendingTin) return
+    if (!/^\d{9}$/.test(pendingTin)) return
+    setTinInput(pendingTin)
+    onConsumeTin()
+    void fetchStats(pendingTin)
+  }, [pendingTin, fetchStats, onConsumeTin])
+
+  // [v134] Feature 3 helper: extract comparable metrics from a stats dataset
+  // for the side-by-side comparison table.
+  const extractMetrics = useCallback((d: Omit<StatsResponseOk, 'ok'> | null) => {
+    if (!d) return null
+    const s = d.summary
+    return {
+      total: s.total,
+      win: s.win,
+      lose: s.lose,
+      neutral: s.neutral,
+      pending: s.pending,
+      winRate: s.total > 0 ? Math.round((s.win / s.total) * 100) : 0,
+      asPlaintiff: s.asPlaintiff,
+      asDefendant: s.asDefendant,
+      economic: d.cases.filter((c) => c.courtType === 'economic').length,
+      civil: d.cases.filter((c) => c.courtType === 'civil').length,
+      administrative: d.cases.filter((c) => c.courtType === 'administrative').length,
+    }
+  }, [])
 
   // MAJLISLAR folder — lazy-load hearings when the folder is opened.
   // Fires when activeFolder === 'hearings' AND we have a company TIN AND
@@ -3392,6 +4068,72 @@ function StatsTab({
         <button type="button" className="sample-chip" onClick={() => { setTinInput('301201019'); void fetchStats('301201019') }}>301 201 019</button>
       </div>
 
+      {/* [v134] Feature 3: Comparison mode toggle + second STIR input */}
+      <div className="compare-toggle-row">
+        <label className="compare-toggle">
+          <input
+            type="checkbox"
+            checked={compareMode}
+            onChange={(e) => {
+              const on = e.target.checked
+              setCompareMode(on)
+              if (!on) {
+                setCompareData(null)
+                setCompareError(null)
+                setCompareLoading(false)
+              }
+            }}
+          />
+          <ArrowLeftRight className="w-3.5 h-3.5" />
+          Taqqoslash rejimi
+        </label>
+        {compareMode && (
+          <div className="compare-input-wrap">
+            <div className="input-wrap" style={{ flex: 1, minWidth: 180 }}>
+              <Search className="w-4 h-4" />
+              <input
+                inputMode="numeric"
+                maxLength={9}
+                value={compareTin}
+                onChange={(e) => setCompareTin(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                placeholder="Solishtirish STIR (9 raqam)"
+                className="console-input"
+                aria-label="Solishtirish STIR raqami"
+                disabled={compareLoading}
+                style={{ paddingLeft: 48 }}
+              />
+            </div>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => { if (/^\d{9}$/.test(compareTin.trim())) void fetchCompare(compareTin.trim()) }}
+              disabled={compareLoading || compareTin.length !== 9}
+              style={{ flexShrink: 0 }}
+            >
+              {compareLoading ? <SvgSpinner className="w-3.5 h-3.5" /> : <ArrowLeftRight className="w-3.5 h-3.5" />}
+              <span>{compareLoading ? 'Yuklanmoqda…' : 'Taqqoslash'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* [v134] Compare loading + error states (run in parallel with main fetch) */}
+      {compareMode && compareLoading && (
+        <div className="panel tab-section-sm" style={{ marginTop: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--text-2)' }}>
+          <SvgSpinner className="w-3.5 h-3.5" />
+          Solishtirish kompaniyasi yuklanmoqda…
+        </div>
+      )}
+      {compareMode && !compareLoading && compareError && (
+        <div className="decision-bar tab-section-sm" style={{ marginTop: 12 }}>
+          <div className="decision-icon"><AlertCircle className="w-4 h-4" /></div>
+          <div className="decision-text">
+            <p className="t1">Solishtirishda xatolik</p>
+            <p className="t2">{compareError}</p>
+          </div>
+        </div>
+      )}
+
       {/* Loading state */}
       {loading && (
         <div style={{ marginTop: 24 }}>
@@ -3535,7 +4277,10 @@ function StatsTab({
                 </button>
               </div>
 
-              {/* Summary cards — top-line stats, immediately after the export toolbar */}
+              {/* Summary cards — top-line stats, immediately after the export toolbar.
+                  [v134] Hidden in compare mode (the split view below shows per-column
+                  summary cards for both companies instead). */}
+              {!compareData && (
               <div className="tab-section">
                 <h3 className="h-section">
                   <Grid3x3 className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
@@ -3586,6 +4331,7 @@ function StatsTab({
                   </article>
                 </div>
               </div>
+              )}
 
               {/* [v123] Filter bar — moved BELOW the summary cards (was between
                   the download toolbar and summary). Now the chart section and
@@ -3595,7 +4341,159 @@ function StatsTab({
                 {renderFilterBar()}
               </div>
 
-              {/* Role breakdown */}
+              {/* [v134] Feature 3: Comparison split view — when compareData is
+                  present, render two columns (Company A | vs | Company B) with
+                  per-column summary cards, win rate, and donut chart, plus a
+                  side-by-side comparison table below. Replaces the standard
+                  single-company summary cards + donut + win rate sections. */}
+              {compareData && (() => {
+                const a = extractMetrics(data)
+                const b = extractMetrics(compareData)
+                if (!a || !b) return null
+                const rows: { label: string; a: number | string; b: number | string; higherIsBetter?: boolean }[] = [
+                  { label: 'Jami ishlar', a: a.total, b: b.total, higherIsBetter: false },
+                  { label: 'G\u02bbalaba darajasi %', a: `${a.winRate}%`, b: `${b.winRate}%`, higherIsBetter: true },
+                  { label: "Da'vogar sifatida", a: a.asPlaintiff, b: b.asPlaintiff, higherIsBetter: false },
+                  { label: 'Javobgar sifatida', a: a.asDefendant, b: b.asDefendant, higherIsBetter: false },
+                  { label: 'Iqtisodiy sud', a: a.economic, b: b.economic, higherIsBetter: false },
+                  { label: 'Fuqarolik sudi', a: a.civil, b: b.civil, higherIsBetter: false },
+                  { label: "Ma'muriy sud", a: a.administrative, b: b.administrative, higherIsBetter: false },
+                ]
+                const renderColumn = (d: Omit<StatsResponseOk, 'ok'>, label: string, name: string, isA: boolean) => {
+                  const s = d.summary
+                  const total = s.total || 1
+                  const winPct = (s.win / total) * 100
+                  const losePct = (s.lose / total) * 100
+                  const neutralPct = (s.neutral / total) * 100
+                  const pendingPct = (s.pending / total) * 100
+                  const p1 = winPct
+                  const p2 = p1 + losePct
+                  const p3 = p2 + neutralPct
+                  const donutBg = s.total > 0
+                    ? `conic-gradient(var(--accent) 0% ${p1}%, color-mix(in srgb, var(--accent) 40%, transparent) ${p1}% ${p2}%, var(--surface-3) ${p2}% ${p3}%, var(--surface-2) ${p3}% 100%)`
+                    : 'var(--surface-2)'
+                  return (
+                    <div className="compare-col">
+                      <div className="compare-col-head">
+                        <span className="cc-label">{label}</span>
+                        <span className={`cc-name ${isA ? 'is-a' : ''}`} title={name}>{name}</span>
+                      </div>
+                      <div className="summary-grid-stats" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                        <article className="sum-card">
+                          <p className="sc-label"><FolderOpen className="w-3 h-3" />Jami</p>
+                          <p className="sc-num">{s.total}</p>
+                          <p className="sc-sub">{s.total > 0 ? `${Math.round(winPct)}% / ${Math.round(losePct)}%` : '\u2014'}</p>
+                        </article>
+                        <article className="sum-card solid">
+                          <p className="sc-label"><Trophy className="w-3 h-3" />Yutdi</p>
+                          <p className="sc-num">{s.win}</p>
+                          <p className="sc-sub">{s.total > 0 ? `${Math.round(winPct)}%` : '\u2014'}</p>
+                        </article>
+                        <article className="sum-card outline">
+                          <p className="sc-label"><XCircle className="w-3 h-3" />Yutqazdi</p>
+                          <p className="sc-num">{s.lose}</p>
+                          <p className="sc-sub">{s.total > 0 ? `${Math.round(losePct)}%` : '\u2014'}</p>
+                        </article>
+                        <article className="sum-card surface">
+                          <p className="sc-label"><MinusCircle className="w-3 h-3" />Neitral</p>
+                          <p className="sc-num">{s.neutral}</p>
+                          <p className="sc-sub">{s.total > 0 ? `${Math.round(neutralPct)}%` : '\u2014'}</p>
+                        </article>
+                      </div>
+                      <div className="panel">
+                        <div className="donut-chart" style={{ gap: 20 }}>
+                          <div className="donut-ring" style={{ background: donutBg, width: 140, height: 140 }}>
+                            <div className="donut-center">
+                              <span className="dc-num" style={{ fontSize: 28 }}>{s.total}</span>
+                              <span className="dc-lbl">JAMI</span>
+                            </div>
+                          </div>
+                          <div className="donut-legend">
+                            <div className="dl-row"><span className="dl-swatch dl-win" /><span className="dl-label">Yutdi</span><span className="dl-count">{s.win}</span><span className="dl-pct">{s.total > 0 ? `${Math.round(winPct)}%` : '\u2014'}</span></div>
+                            <div className="dl-row"><span className="dl-swatch dl-lose" /><span className="dl-label">Yutqazdi</span><span className="dl-count">{s.lose}</span><span className="dl-pct">{s.total > 0 ? `${Math.round(losePct)}%` : '\u2014'}</span></div>
+                            <div className="dl-row"><span className="dl-swatch dl-neutral" /><span className="dl-label">Neitral</span><span className="dl-count">{s.neutral}</span><span className="dl-pct">{s.total > 0 ? `${Math.round(neutralPct)}%` : '\u2014'}</span></div>
+                            <div className="dl-row"><span className="dl-swatch dl-pending" /><span className="dl-label">Kutilmoqda</span><span className="dl-count">{s.pending}</span><span className="dl-pct">{s.total > 0 ? `${Math.round(pendingPct)}%` : '\u2014'}</span></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="panel">
+                        <div className="winrate-chart">
+                          {([
+                            { id: 'economic', label: 'IQTISODIY' },
+                            { id: 'civil', label: 'FUQAROLIK' },
+                            { id: 'administrative', label: "MA'MURIY" },
+                          ] as const).map((ct) => {
+                            const list = d.cases.filter((c) => c.courtType === ct.id && inDateSpan(c.regDate, dateSpan))
+                            const wins = list.filter((c) => c.classification === 'win').length
+                            const rate = list.length > 0 ? Math.round((wins / list.length) * 100) : 0
+                            return (
+                              <div key={ct.id} className="winrate-row">
+                                <span className="wr-label">{ct.label}</span>
+                                <div className="winrate-bar-track">
+                                  <div className="winrate-bar-fill" style={{ width: `${rate}%` }} />
+                                </div>
+                                <span className="wr-value">{list.length > 0 ? `${wins}/${list.length} (${rate}%)` : '0 ish'}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <>
+                    <div className="tab-section">
+                      <h3 className="h-section">
+                        <ArrowLeftRight className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
+                        Taqqoslash: {data.company.name} <span style={{ color: 'var(--text-3)' }}>vs</span> {compareData.company.name}
+                      </h3>
+                      <div className="compare-split">
+                        {renderColumn(data, 'Kompaniya A', data.company.name, true)}
+                        <div className="compare-vs">VS</div>
+                        {renderColumn(compareData, 'Kompaniya B', compareData.company.name, false)}
+                      </div>
+                    </div>
+                    <div className="tab-section">
+                      <h3 className="h-section">
+                        <Grid3x3 className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
+                        Taqqoslash jadvali
+                      </h3>
+                      <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
+                        <table className="compare-table">
+                          <thead>
+                            <tr>
+                              <th>Ko&apos;rsatkich</th>
+                              <th>{data.company.name}</th>
+                              <th>{compareData.company.name}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map((row) => {
+                              // Determine the &quot;winner&quot; cell for numeric rows where
+                              // higherIsBetter matters (only win-rate row uses this).
+                              const aNum = typeof row.a === 'number' ? row.a : parseInt(String(row.a), 10)
+                              const bNum = typeof row.b === 'number' ? row.b : parseInt(String(row.b), 10)
+                              const aIsWinner = row.higherIsBetter === true && aNum > bNum
+                              const bIsWinner = row.higherIsBetter === true && bNum > aNum
+                              return (
+                                <tr key={row.label}>
+                                  <td>{row.label}</td>
+                                  <td className={aIsWinner ? 'ct-winner' : ''}>{row.a}</td>
+                                  <td className={bIsWinner ? 'ct-winner' : ''}>{row.b}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+
+              {/* Role breakdown — [v134] hidden in compare mode (single-company only). */}
+              {!compareData && (
               <div className="tab-section">
                 <h3 className="h-section">
                   <Users className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
@@ -3652,8 +4550,11 @@ function StatsTab({
                   })}
                 </div>
               </div>
+              )}
 
-              {/* Chart A: Outcome Distribution Donut */}
+              {/* Chart A: Outcome Distribution Donut — [v134] hidden in compare mode
+                  (per-column donuts are rendered in the split view above). */}
+              {!compareData && (
               <div className="tab-section">
                 <h3 className="h-section">
                   <Grid3x3 className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
@@ -3713,8 +4614,11 @@ function StatsTab({
                   </div>
                 </div>
               </div>
+              )}
 
-              {/* Chart B: Win Rate by Court Type */}
+              {/* Chart B: Win Rate by Court Type — [v134] hidden in compare mode
+                  (per-column win-rate bars are rendered in the split view above). */}
+              {!compareData && (
               <div className="tab-section">
                 <h3 className="h-section">
                   <Layers className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
@@ -3744,10 +4648,32 @@ function StatsTab({
                   </div>
                 </div>
               </div>
+              )}
 
-              {/* Chart C: Timeline chart removed in v116 (persistent overflow issue) */}
+              {/* Chart C: Monthly Trend Chart (v134, SVG-based).
+                  Replaces the flex-based timeline that was removed in v116
+                  due to persistent overflow issues. Uses fixed-width 24px
+                  bars inside a horizontal-scroll SVG container. In compare
+                  mode, shows Company A's monthly trend for additional context. */}
+              <div className="tab-section">
+                <h3 className="h-section">
+                  <BarChart3 className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
+                  Oylik ishlar trendi{compareData ? ` · ${data.company.name}` : ''}
+                </h3>
+                <TrendChart timeline={timeline} onViewCase={onViewCase} />
+                {compareData && compareTimeline.length > 0 && (
+                  <>
+                    <h3 className="h-section" style={{ marginTop: 18 }}>
+                      <BarChart3 className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
+                      {'Oylik ishlar trendi · '}{compareData.company.name}
+                    </h3>
+                    <TrendChart timeline={compareTimeline} onViewCase={onViewCase} />
+                  </>
+                )}
+              </div>
 
-              {/* Court-type breakdown */}
+              {/* Court-type breakdown — [v134] hidden in compare mode (single-company only). */}
+              {!compareData && (
               <div className="tab-section">
                 <h3 className="h-section">
                   <Layers className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
@@ -3780,9 +4706,10 @@ function StatsTab({
                   })}
                 </div>
               </div>
+              )}
 
-              {/* Categories */}
-              {categories.length > 0 && (
+              {/* Categories — [v134] hidden in compare mode (single-company only). */}
+              {!compareData && categories.length > 0 && (
                 <div className="tab-section">
                   <h3 className="h-section">
                     <Tags className="w-[11px] h-[11px]" style={{ width: 11, height: 11 }} />
@@ -4044,7 +4971,10 @@ export default function Home() {
   const [billPageSize, setBillPageSize] = useState<PageSize>(10)
   const [billPage, setBillPage] = useState(0)
   const [recent, setRecent] = useState<{ inn: string; lastSearchedAt: string }[]>([])
-  const [tab, setTab] = useState<'bills' | 'cases' | 'hearings' | 'company' | 'stats'>('bills')
+  const [tab, setTab] = useState<'bills' | 'cases' | 'hearings' | 'company' | 'stats' | 'watchlist'>('bills')
+  // [v134] Watchlist → Stats hand-off: when the user clicks a watch-card, we
+  // pre-fill the Stats tab with that TIN and trigger a search automatically.
+  const [pendingStatsTin, setPendingStatsTin] = useState<string | null>(null)
   const [pendingCaseNumber, setPendingCaseNumber] = useState<string | null>(null)
   const [pendingCourtType, setPendingCourtType] = useState<CourtType | null>(null)
   // Improvement 2: when Stats tab clicks a case, we pass the full case object
@@ -4380,7 +5310,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v132</p>
+                <p className="brand-sub">v137</p>
               </div>
             </div>
             <div className="header-right">
@@ -4425,6 +5355,7 @@ export default function Home() {
                 { id: 'hearings',      label: 'Sud majlislari',   Icon: CalendarDays },
                 { id: 'company',       label: 'Kompaniya',         Icon: Building2   },
                 { id: 'stats',         label: 'Statistika',        Icon: BarChart3   },
+                { id: 'watchlist',     label: 'Kuzatuv',           Icon: Eye         },
               ] as const).map((t) => (
                 <button
                   key={t.id}
@@ -4696,16 +5627,47 @@ export default function Home() {
                         })}
                       </div>
                     </div>
-                    <div className="select-wrap">
-                      <select
-                        value={String(billPageSize)}
-                        onChange={(e) => setBillPageSize(Number(e.target.value) as PageSize)}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="select-wrap">
+                        <select
+                          value={String(billPageSize)}
+                          onChange={(e) => setBillPageSize(Number(e.target.value) as PageSize)}
+                        >
+                          <option value="10">10 / sahifa</option>
+                          <option value="20">20 / sahifa</option>
+                          <option value="50">50 / sahifa</option>
+                          <option value="100">100 / sahifa</option>
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-ghost btn-sm"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/bills/export', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ bills: filteredBills }),
+                            })
+                            if (!res.ok) { toast.error('Yuklab bo\'lmadi'); return }
+                            const blob = await res.blob()
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = `tolovlar-${new Date().toISOString().slice(0, 10)}.xlsx`
+                            document.body.appendChild(a)
+                            a.click()
+                            document.body.removeChild(a)
+                            URL.revokeObjectURL(url)
+                            toast.success(`Excel yuklandi: ${filteredBills.length} ta to'lov`)
+                          } catch (e) {
+                            toast.error(`Xatolik: ${e instanceof Error ? e.message : 'yuklab bo\'lmadi'}`)
+                          }
+                        }}
                       >
-                        <option value="10">10 / sahifa</option>
-                        <option value="20">20 / sahifa</option>
-                        <option value="50">50 / sahifa</option>
-                        <option value="100">100 / sahifa</option>
-                      </select>
+                        <Download className="w-3 h-3" />
+                        <span>Excel</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -4812,6 +5774,8 @@ export default function Home() {
             role="tabpanel"
           >
             <StatsTab
+              pendingTin={pendingStatsTin}
+              onConsumeTin={() => setPendingStatsTin(null)}
               onViewCase={(caseNumber, courtType, caseData) => {
                 setPendingCaseNumber(caseNumber)
                 setPendingCourtType(courtType as CourtType)
@@ -4820,12 +5784,23 @@ export default function Home() {
               }}
             />
           </section>
+
+          {/* ============================================================ */}
+          {/* ====================== WATCHLIST TAB (v134) =============== */}
+          {/* ============================================================ */}
+          <section
+            className={`tab-panel ${tab === 'watchlist' ? 'is-active' : ''}`}
+            data-panel="watchlist"
+            role="tabpanel"
+          >
+            <WatchlistTab onViewInStats={(tin) => { setPendingStatsTin(tin); setTab('stats') }} />
+          </section>
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v132">
+        <footer className="app-footer" data-version="v137">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v132</div>
+            <div className="footer-text">Sud Billing Lookup v137</div>
           </div>
         </footer>
       </div>

@@ -105,50 +105,88 @@ export async function searchCourtCases(
 
   // Call both APIs in parallel and merge results.
   // Route through CF Workers to avoid IP blocking (same as billing.sud.uz).
+  //
+  // v138 RELIABILITY FIX: Previously each attempt tried only ONE CF Worker
+  // (round-robin). If that worker was slow/down, the request failed and
+  // returned [] — 0 cases. Now we try ALL workers per attempt with immediate
+  // failover, longer timeout (12s vs 8s), and 3 attempts (vs 2). This ensures
+  // we get the full 100 cases even when 1-2 workers are blipping.
   const promises = apiConfig.map(async ({ url, mapper }) => {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const proxyUrl = proxyCourtUrl(url)
-        console.log(`[court-case] fetching ${url}${attempt > 0 ? ` (retry ${attempt + 1})` : ''} via ${proxyUrl.includes('workers.dev') ? 'CF Worker' : 'direct'}`)
-        const res = await fetch(proxyUrl, {
-          headers: {
-            Accept: 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            Referer: 'https://my.sud.uz/court-case',
-          },
-          signal: AbortSignal.timeout(8000),
-        })
-        if (!res.ok) {
-          console.log(`[court-case] ${url} returned HTTP ${res.status}`)
-          return []
+    const maxAttempts = 3
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Try ALL workers on each attempt — first one that succeeds wins.
+      // Shuffle the worker order on each attempt so we don't always start
+      // with the same (possibly dead) worker.
+      const workerOrder = attempt === 0
+        ? allWorkers
+        : [...allWorkers].sort(() => Math.random() - 0.5)
+
+      let lastErr = ''
+      let succeeded = false
+      let result: CourtCase[] = []
+
+      for (const worker of workerOrder) {
+        const proxyUrl = worker + url
+        try {
+          console.log(`[court-case] fetching ${url}${attempt > 0 ? ` (retry ${attempt + 1})` : ''} via ${worker.includes('workers.dev') ? 'CF Worker' : 'direct'}`)
+          const res = await fetch(proxyUrl, {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              Referer: 'https://my.sud.uz/court-case',
+            },
+            signal: AbortSignal.timeout(12000),
+          })
+          if (!res.ok) {
+            lastErr = `HTTP ${res.status}`
+            console.log(`[court-case] ${url} returned HTTP ${res.status} via ${worker}`)
+            continue // try next worker
+          }
+          const text = await res.text()
+          if (text === 'Иш топилмади' || text.includes('топилмади')) {
+            // Not found — this is a definitive "no cases" from the origin,
+            // not a worker failure. Return empty immediately.
+            return []
+          }
+          const data = JSON.parse(text)
+          const items = Array.isArray(data) ? data : (data.data || [])
+          result = items.map(mapper)
+          succeeded = true
+          break // got data — stop trying workers
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          lastErr = msg
+          console.error(`[court-case] ${url} via ${worker} failed: ${msg}`)
+          // continue to next worker
         }
-        const text = await res.text()
-        if (text === 'Иш топилмади' || text.includes('топилмади')) {
-          return []
-        }
-        const data = JSON.parse(text)
-        const items = Array.isArray(data) ? data : (data.data || [])
-        return items.map(mapper)
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        console.error(`[court-case] ${url} attempt ${attempt + 1} failed: ${msg}`)
-        // Retry on transient errors: 521 (origin down), connection errors, timeouts.
-        // These are often temporary — the server blips for a few seconds then recovers.
-        // A single retry with a short delay catches most of these.
-        const isTransient = msg.includes('521') ||
-          msg.includes('Unable to connect') ||
-          msg.includes('fetch failed') ||
-          msg.includes('ECONNREFUSED') ||
-          msg.includes('ENOTFOUND') ||
-          msg.includes('typo in the url') ||
-          msg.includes('aborted')
-        if (attempt === 0 && isTransient) {
-          console.log(`[court-case] retrying ${url} (transient error) in 1s...`)
-          await new Promise((r) => setTimeout(r, 1000))
-          continue
-        }
-        return []
       }
+
+      if (succeeded) {
+        return result
+      }
+
+      // All workers failed on this attempt — check if we should retry
+      const isTransient = lastErr.includes('521') ||
+        lastErr.includes('522') ||
+        lastErr.includes('523') ||
+        lastErr.includes('Unable to connect') ||
+        lastErr.includes('fetch failed') ||
+        lastErr.includes('ECONNREFUSED') ||
+        lastErr.includes('ENOTFOUND') ||
+        lastErr.includes('typo in the url') ||
+        lastErr.includes('aborted') ||
+        lastErr.includes('timeout') ||
+        lastErr.includes('Timeout') ||
+        lastErr.includes('network') ||
+        lastErr.includes('socket hang up')
+      if (attempt < maxAttempts - 1 && isTransient) {
+        const delay = 800 + attempt * 600
+        console.log(`[court-case] all workers failed for ${url} (attempt ${attempt + 1}/${maxAttempts}), retrying in ${delay}ms...`)
+        await new Promise((r) => setTimeout(r, delay))
+        continue
+      }
+      // Non-transient error or out of retries
+      return []
     }
     return []
   })

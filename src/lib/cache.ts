@@ -5,12 +5,42 @@
  * upcoming hearings) within a 5-minute window. The bills tab is intentionally
  * NOT cached (it streams results progressively).
  *
- * The cache prefix `sb-cache:` keeps our keys isolated from other apps that
- * might share the same localStorage (e.g. the saved-companies list).
+ * The cache prefix `sb-cache-v138:` keeps our keys isolated from other apps
+ * that might share the same localStorage (e.g. the saved-companies list).
+ *
+ * v138: The version stamp in the prefix (`v138`) ensures that when we ship a
+ * fix that changes what the backend returns (e.g. the v138 court-case retry
+ * fix that now returns 100 cases instead of 11), old stale caches from
+ * previous versions are automatically orphaned and the user gets fresh data
+ * on their next visit. When bumping the version, update PREFIX below.
  */
 
-const PREFIX = 'sb-cache:'
+const CACHE_VERSION = 'v138'
+const PREFIX = `sb-cache-${CACHE_VERSION}:`
 const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
+
+/**
+ * One-time sweep: on first load with a new CACHE_VERSION, remove all old
+ * `sb-cache-v*:` entries from previous versions so they don't waste quota.
+ */
+if (typeof window !== 'undefined') {
+  try {
+    const sweepKey = `sb-cache-swept:${CACHE_VERSION}`
+    if (!localStorage.getItem(sweepKey)) {
+      const toRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith('sb-cache-') && k.startsWith('sb-cache-swept:') === false && !k.startsWith(PREFIX)) {
+          toRemove.push(k)
+        }
+      }
+      for (const k of toRemove) localStorage.removeItem(k)
+      localStorage.setItem(sweepKey, '1')
+    }
+  } catch {
+    // ignore quota errors
+  }
+}
 
 /**
  * Read a cached value by key. Returns null if the cache is missing, expired,

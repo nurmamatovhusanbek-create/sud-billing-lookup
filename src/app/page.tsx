@@ -25,7 +25,7 @@ import {
   type InstanceData,
   type FullCaseData,
 } from '@/lib/court-case-types'
-import { getCached, setCached, cacheKey } from '@/lib/cache'
+import { getCached, setCached, clearCached, cacheKey } from '@/lib/cache'
 
 // ---- SVG spinner (monochrome — uses var(--accent)) -------------------
 
@@ -3585,26 +3585,33 @@ function StatsTab({
   }, [data, dateSpan])
 
   // Fetch handler
-  const fetchStats = useCallback(async (tin: string) => {
+  const fetchStats = useCallback(async (tin: string, force = false) => {
     if (!/^\d{9}$/.test(tin)) {
       setError("STIR aynan 9 ta raqamdan iborat bo'lishi kerak")
       return
     }
     // 5-min client cache — Stats tab is heavy (orginfo + 3 court searches in
     // parallel) and is frequently re-opened after viewing individual cases.
+    // v139: force=true bypasses the cache (user clicked search again or
+    // pressed the refresh button).
     const cacheK = cacheKey.stats(tin)
-    const cached = getCached<Omit<StatsResponseOk, 'ok'>>(cacheK)
-    if (cached) {
-      setData(cached)
-      setActiveFolder('tahlil')
-      setOutcome('all')
-      setDateSpan('all')
-      setPhase(3)
-      setHearings([])
-      setHearingsTin(null)
-      hearingsFetchedTinRef.current = null
-      toast.success("Statistika keshdan yuklandi")
-      return
+    if (!force) {
+      const cached = getCached<Omit<StatsResponseOk, 'ok'>>(cacheK)
+      if (cached) {
+        setData(cached)
+        setActiveFolder('tahlil')
+        setOutcome('all')
+        setDateSpan('all')
+        setPhase(3)
+        setHearings([])
+        setHearingsTin(null)
+        hearingsFetchedTinRef.current = null
+        toast.success("Statistika keshdan yuklandi")
+        return
+      }
+    } else {
+      // Force-refresh: clear the client cache so we fetch fresh data
+      clearCached(cacheK)
     }
     setLoading(true)
     setError(null)
@@ -3647,7 +3654,10 @@ function StatsTab({
   const onSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     const tin = tinInput.trim()
-    void fetchStats(tin)
+    // v139: If data is already loaded for this TIN, force-refresh (user
+    // clicked search again — they want fresh data, not cached).
+    const isRefresh = data?.company?.tin === tin
+    void fetchStats(tin, isRefresh)
     // [v134] Feature 3: in compare mode with a valid second TIN, fetch the
     // second company's stats IN PARALLEL with the main search. Both fetches
     // kick off at the same instant (Promise.all is not used because the main
@@ -3660,7 +3670,7 @@ function StatsTab({
       setCompareData(null)
       setCompareError(null)
     }
-  }, [tinInput, fetchStats, compareMode, compareTin])
+  }, [tinInput, fetchStats, compareMode, compareTin, data])
 
   // [v134] Feature 3: fetch the second company's stats. Independent from
   // fetchStats so the two columns can load at their own pace.
@@ -4237,6 +4247,19 @@ function StatsTab({
                   <div className="cb-stat"><span className="cb-v">{summary.lose}</span><span className="cb-l">Yutqazdi</span></div>
                   <div className="cb-stat"><span className="cb-v">{summary.neutral}</span><span className="cb-l">Neitral</span></div>
                 </div>
+                {/* v139: Force-refresh button — clears cache and re-fetches */}
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  onClick={() => fetchStats(data.company.tin, true)}
+                  disabled={loading}
+                  aria-label="Yangilash"
+                  title="Keshni tozalab, qayta yuklash"
+                  style={{ marginLeft: 'auto', flexShrink: 0 }}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'spin-anim' : ''}`} />
+                  <span className="sm:inline hidden">Yangilash</span>
+                </button>
               </div>
 
               {/* [v123] Download toolbar — moved to be RIGHT after the company
@@ -5310,7 +5333,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v138</p>
+                <p className="brand-sub">v139</p>
               </div>
             </div>
             <div className="header-right">
@@ -5798,9 +5821,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v138">
+        <footer className="app-footer" data-version="v139">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v138</div>
+            <div className="footer-text">Sud Billing Lookup v139</div>
           </div>
         </footer>
       </div>

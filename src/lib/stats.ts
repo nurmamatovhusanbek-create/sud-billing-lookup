@@ -183,6 +183,29 @@ const COURT_TYPE_MAP: Record<StatsCourtType, StatsCourtType> = {
 // ---- Main workflow ----------------------------------------------------
 
 /**
+ * v139: Server-side in-memory cache for getCompanyStats results.
+ *
+ * Problem: When both the Stats tab and the Watchlist tab load for the same
+ * TIN simultaneously, TWO /api/stats calls fire. Each calls searchCourtCases
+ * independently — one might get 51 cases, the other 28 (if some CF Workers
+ * fail). The user sees whichever completes last, which may be the smaller set.
+ *
+ * Solution: Cache the result for 60 seconds. The FIRST call fetches and caches;
+ * the second call gets the cached result instantly. This also means if the
+ * first call got 51 cases and the second would have gotten 28, the second
+ * still gets 51 (the better result).
+ *
+ * The 60s TTL is short enough that a user clicking "refresh" after a minute
+ * gets fresh data, but long enough to deduplicate concurrent calls.
+ */
+interface StatsCacheEntry {
+  result: Promise<CompanyStats>
+  ts: number
+}
+const statsCache = new Map<string, StatsCacheEntry>()
+const STATS_CACHE_TTL = 60 * 1000 // 60 seconds
+
+/**
  * Build the full stats payload for a company TIN.
  *
  * 1. Lookup company on orginfo.uz (worker-routed) — gives us the canonical
@@ -200,6 +223,34 @@ export async function getCompanyStats(
   tin: string,
 ): Promise<CompanyStats> {
   console.log(`[stats] building stats for TIN ${tin}`)
+
+  // v139: Check server-side cache first — deduplicates concurrent calls
+  const cached = statsCache.get(tin)
+  if (cached && Date.now() - cached.ts < STATS_CACHE_TTL) {
+    console.log(`[stats] ${tin}: returning cached result (age ${Math.round((Date.now() - cached.ts) / 1000)}s)`)
+    return cached.result
+  }
+
+  // Fire the actual fetch and store the PROMISE (not the result) so that
+  // concurrent calls all await the same in-flight fetch.
+  const fetchPromise = fetchCompanyStatsInternal(tin)
+  statsCache.set(tin, { result: fetchPromise, ts: Date.now() })
+
+  // Clean up old entries (sweep — don't let the map grow unbounded)
+  if (statsCache.size > 50) {
+    const now = Date.now()
+    for (const [k, v] of statsCache) {
+      if (now - v.ts > STATS_CACHE_TTL * 5) statsCache.delete(k)
+    }
+  }
+
+  return fetchPromise
+}
+
+/** Internal fetch logic — called once per TIN, cached by getCompanyStats. */
+async function fetchCompanyStatsInternal(
+  tin: string,
+): Promise<CompanyStats> {
 
   // Fire orginfo + chamber.uz + 3 court-type searches ALL IN PARALLEL.
   // Previously orginfo was awaited first — if it timed out (30s), the entire

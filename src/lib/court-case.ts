@@ -28,23 +28,62 @@ const FALLBACK_WORKERS = [
   'https://orange-darkness-8843.najimsheikh071.workers.dev/',
   'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
 ]
-function getCfWorkerUrl(url: string): string {
-  const urls: string[] = []
+
+// v139: Public CORS proxies (DIFFERENT infrastructure than CF Workers).
+// When ALL CF Workers fail due to a network-level outage (DNS blip, sandbox
+// connectivity issue), these public proxies provide a last-resort fallback.
+// They have different IP ranges and DNS, so they work when workers.dev is
+// unreachable. Note: some need encodeURIComponent, some don't.
+const PUBLIC_CORS_PROXIES = [
+  { prefix: 'https://proxy.cors.sh/', needsEncoding: false },
+  { prefix: 'https://api.allorigins.win/raw?url=', needsEncoding: true },
+  { prefix: 'https://corsproxy.io/?url=', needsEncoding: true },
+  { prefix: 'https://api.codetabs.com/v1/proxy/?quest=', needsEncoding: false },
+]
+
+/**
+ * Build the full list of proxy URLs to try for a given target URL.
+ * Order: CF Workers (env or fallback) → public CORS proxies → direct.
+ * The direct fetch is the last resort — it works when the sandbox has direct
+ * connectivity to the origin (sometimes it does, sometimes it's IP-blocked).
+ */
+function buildProxyChain(targetUrl: string): { url: string; label: string }[] {
+  const chain: { url: string; label: string }[] = []
+
+  // 1. CF Workers
+  const cfWorkerUrls: string[] = []
   const multi = process.env.CF_WORKER_URLS
   if (multi) {
     for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
-      urls.push(u.endsWith('/') ? u : u + '/')
+      cfWorkerUrls.push(u.endsWith('/') ? u : u + '/')
     }
   }
   const single = process.env.CF_WORKER_URL
   if (single) {
     const normalized = single.endsWith('/') ? single : single + '/'
-    if (!urls.includes(normalized)) urls.push(normalized)
+    if (!cfWorkerUrls.includes(normalized)) cfWorkerUrls.push(normalized)
   }
-  if (urls.length === 0) return FALLBACK_WORKERS[0] + url // no workers — try direct
-  const worker = urls[courtWorkerCounter % urls.length]
-  courtWorkerCounter++
-  return worker + url
+  const workers = cfWorkerUrls.length > 0 ? cfWorkerUrls : FALLBACK_WORKERS
+  for (const w of workers) {
+    chain.push({ url: w + targetUrl, label: 'CF Worker' })
+  }
+
+  // 2. Public CORS proxies
+  for (const p of PUBLIC_CORS_PROXIES) {
+    const proxiedUrl = p.needsEncoding ? p.prefix + encodeURIComponent(targetUrl) : p.prefix + targetUrl
+    chain.push({ url: proxiedUrl, label: 'CORS proxy' })
+  }
+
+  // 3. Direct fetch (last resort — may be IP-blocked, but sometimes works)
+  chain.push({ url: targetUrl, label: 'direct' })
+
+  return chain
+}
+
+function getCfWorkerUrl(url: string): string {
+  // Legacy helper kept for fetchJadvalApiDetails / fetchJadvalDetails.
+  const chain = buildProxyChain(url)
+  return chain[0].url
 }
 
 // ---- Types (re-exported from court-case-types.ts) ----
@@ -140,7 +179,14 @@ export async function searchCourtCases(
           if (!res.ok) {
             lastErr = `HTTP ${res.status}`
             console.log(`[court-case] ${url} returned HTTP ${res.status} via ${worker}`)
-            continue // try next worker
+            // v139: HTTP 404/410 = endpoint doesn't exist (definitive, NOT transient).
+            // Retrying with other workers wastes ~8s for nothing. Return [] immediately.
+            // Examples: CONFLICT/findByTin returns 404 (endpoint doesn't exist on jadvalapi).
+            if (res.status === 404 || res.status === 410) {
+              console.log(`[court-case] ${url} returned ${res.status} — endpoint not found, skipping remaining workers`)
+              return []
+            }
+            continue // try next worker for other HTTP errors (521, 502, etc.)
           }
           const text = await res.text()
           if (text === 'Иш топилмади' || text.includes('топилмади')) {

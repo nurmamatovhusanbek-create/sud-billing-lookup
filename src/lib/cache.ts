@@ -15,7 +15,7 @@
  * on their next visit. When bumping the version, update PREFIX below.
  */
 
-const CACHE_VERSION = 'v138'
+const CACHE_VERSION = 'v139'
 const PREFIX = `sb-cache-${CACHE_VERSION}:`
 const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
 

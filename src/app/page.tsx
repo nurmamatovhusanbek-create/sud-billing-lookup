@@ -26,6 +26,8 @@ import {
   type FullCaseData,
 } from '@/lib/court-case-types'
 import { getCached, setCached, clearCached, cacheKey } from '@/lib/cache'
+import { DataStrip, DataField } from '@/components/ui-custom/data-strip'
+import { ReceiptView } from '@/components/ui-custom/receipt-view'
 
 // ---- SVG spinner (monochrome — uses var(--accent)) -------------------
 
@@ -557,64 +559,32 @@ function BillCard({
         </div>
       </div>
 
-      {/* Money cells */}
-      <div className="money-grid">
-        <div className="money-cell">
-          <div className="lbl"><Wallet className="w-3 h-3" />Kvitansiya</div>
-          <div className="val">{formatSum(detail?.amount)}</div>
-          <div className="sub">so&apos;m</div>
-        </div>
-        <div className="money-cell is-paid">
-          <div className="lbl"><CheckCheck className="w-3 h-3" />To&apos;langan</div>
-          <div className="val">{formatSum(detail?.paidAmount)}</div>
-          <div className="sub">so&apos;m</div>
-        </div>
-        <div className="money-cell is-unpaid">
-          <div className="lbl"><Clock className="w-3 h-3" />To&apos;lanmagan</div>
-          <div className="val">{formatSum(detail?.mustPayAmount)}</div>
-          <div className="sub">so&apos;m</div>
-        </div>
-        <div className="money-cell">
-          <div className="lbl"><Receipt className="w-3 h-3" />Sarflangan</div>
-          <div className="val">{formatSum(spentAmount)}</div>
-          <div className="sub">so&apos;m</div>
-        </div>
-        <div className="money-cell is-accent">
-          <div className="lbl"><ArrowLeftRight className="w-3 h-3" />Qoldiq</div>
-          <div className="val">{formatSum(detail?.balance)}</div>
-          <div className="sub">so&apos;m</div>
-        </div>
-      </div>
+      {/* v145 §3: DataStrip replaces box-in-box money-grid */}
+      <DataStrip>
+        <DataField label="Kvitansiya" icon={Wallet} value={formatSum(detail?.amount)} mono sub="so'm" />
+        <DataField label="To'langan" icon={CheckCheck} value={formatSum(detail?.paidAmount)} mono sub="so'm" tone="paid" />
+        <DataField label="To'lanmagan" icon={Clock} value={formatSum(detail?.mustPayAmount)} mono sub="so'm" tone="unpaid" />
+        <DataField label="Sarflangan" icon={Receipt} value={formatSum(spentAmount)} mono sub="so'm" />
+        <DataField label="Qoldiq" icon={ArrowLeftRight} value={formatSum(detail?.balance)} mono sub="so'm" tone="accent" />
+      </DataStrip>
 
-      {/* Court + dates info grid */}
-      <div className="info-grid">
-        <div className="info-row">
-          <p className="lbl"><Building2 className="w-3 h-3" />Sud</p>
-          <p className="val">{detail?.court || '—'}</p>
-        </div>
-        <div className="info-row">
-          <p className="lbl"><CalendarDays className="w-3 h-3" />Berilgan sana</p>
-          <p className="val mono">{formatDate(detail?.issued ?? bill.issued)}</p>
-        </div>
-        <div className="info-row">
-          <p className="lbl"><Award className="w-3 h-3" />Amal qilish muddati</p>
-          <p className="val mono">{formatDate(detail?.overdue)}</p>
-        </div>
-      </div>
+      {/* v145 §3: DataStrip replaces box-in-box info-grid */}
+      <DataStrip>
+        <DataField label="Sud" icon={Building2} value={detail?.court} />
+        <DataField label="Berilgan sana" icon={CalendarDays} value={formatDate(detail?.issued ?? bill.issued)} mono />
+        <DataField label="Amal qilish muddati" icon={Award} value={formatDate(detail?.overdue)} mono />
+      </DataStrip>
 
-      {/* Purpose + description */}
+      {/* v145 §3: Purpose as a span DataField */}
       {(detail?.purpose || detail?.description || detail?.payCategory) && (
-        <div className="info-grid" style={{ marginBottom: 12 }}>
-          <div className="info-row" style={{ gridColumn: '1 / -1' }}>
-            <p className="lbl"><FileText className="w-3 h-3" />Maqsad</p>
-            <p className="val">
-              {detail?.purpose || '—'}
-              {detail?.description && (
-                <span style={{ color: 'var(--text-3)' }}> · {detail.description}{detail.payCategory ? ` (${detail.payCategory})` : ''}</span>
-              )}
-            </p>
-          </div>
-        </div>
+        <DataStrip>
+          <DataField
+            label="Maqsad"
+            icon={FileText}
+            value={detail?.purpose || '—'}
+            span
+          />
+        </DataStrip>
       )}
 
       {bill.error && (
@@ -645,62 +615,19 @@ function BillCard({
           {expanded && (
             <div className="expand-content is-open">
               <div className="expand-inner">
-                {detail?.claimCaseNumber && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>№ Da'vo ish raqami:</span>
-                    <span className="mono" style={{ fontWeight: 700 }}>{detail.claimCaseNumber}</span>
-                    <CopyButton value={detail.claimCaseNumber} label="Nusxalash" />
-                    <button
-                      type="button"
-                      className="korish-btn"
-                      onClick={() => onViewCase(detail.claimCaseNumber!, detail.courtType || undefined)}
-                    >
-                      <Eye className="w-3.5 h-3.5" /> Ko&apos;rish
-                    </button>
-                  </div>
-                )}
-                <table className="usage-table">
-                  <thead>
-                    <tr>
-                      <th>Ish / ariza raqami</th>
-                      <th>Holati</th>
-                      <th style={{ textAlign: 'right' }}>Summasi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {usedHistory.map((h, i) => (
-                      <tr key={i}>
-                        <td className="col-num">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ color: 'var(--text-3)' }}>№</span>
-                            {h.caseNumber || (h.caseId ? `#${h.caseId}` : '—')}
-                            {h.caseNumber && <CopyButton value={h.caseNumber} label="Nusxalash" />}
-                            {h.caseNumber && (
-                              <button
-                                type="button"
-                                className="korish-btn"
-                                onClick={() => onViewCase(h.caseNumber!, h.courtType || undefined)}
-                              >
-                                <Eye className="w-3.5 h-3.5" /> Ko&apos;rish
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          {h.rolledBackAt ? (
-                            <span className="badge b-unpaid">Qaytarilgan</span>
-                          ) : (
-                            <span className="badge b-paid">Ishlatilgan</span>
-                          )}
-                        </td>
-                        <td className="col-amt">
-                          {formatSum(h.amount)}
-                          <span style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 4 }}>so&apos;m</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {/* v145 §5: ReceiptView replaces plain usage-table */}
+                <ReceiptView
+                  billNumber={bill.number}
+                  issued={detail?.issued ?? bill.issued}
+                  court={detail?.court}
+                  purpose={detail?.purpose}
+                  amount={detail?.amount}
+                  claimCaseNumber={detail?.claimCaseNumber}
+                  history={usedHistory}
+                  onViewCase={onViewCase}
+                  formatSum={formatSum}
+                  formatDate={formatDate}
+                />
               </div>
             </div>
           )}
@@ -1516,24 +1443,13 @@ function CourtCaseCard({
         </div>
       </div>
 
-      <div className="info-grid">
-        <div className="info-row">
-          <p className="lbl"><Building2 className="w-3 h-3" />Sud</p>
-          <p className="val">{caseData.courtName || '—'}</p>
-        </div>
-        <div className="info-row">
-          <p className="lbl"><CalendarDays className="w-3 h-3" />Ariza berilgan sana</p>
-          <p className="val mono">{caseData.dateFiled || '—'}</p>
-        </div>
-        <div className="info-row">
-          <p className="lbl"><Building2 className="w-3 h-3" />Da&apos;vogar</p>
-          <p className="val">{caseData.plaintiff || '—'}</p>
-        </div>
-        <div className="info-row">
-          <p className="lbl"><Building2 className="w-3 h-3" />Javobgar</p>
-          <p className="val">{caseData.defendant || '—'}</p>
-        </div>
-      </div>
+      {/* v145 §3: DataStrip replaces box-in-box info-grid */}
+      <DataStrip>
+        <DataField label="Sud" icon={Building2} value={caseData.courtName} />
+        <DataField label="Ariza berilgan sana" icon={CalendarDays} value={caseData.dateFiled} mono />
+        <DataField label="Da'vogar" icon={Building2} value={caseData.plaintiff} />
+        <DataField label="Javobgar" icon={Building2} value={caseData.defendant} />
+      </DataStrip>
 
       {caseData.result && caseData.result !== '—' && (
         <div className="decision-bar" style={{ marginTop: 20 }}>
@@ -1957,32 +1873,18 @@ function UpcomingHearingCard({
         </div>
       </div>
 
-      <div className="info-grid">
-        <div className="info-row">
-          <p className="lbl"><CalendarDays className="w-3 h-3" />Majlis sanasi</p>
-          <p className="val mono">{hearing.hearingDate}{hearing.hearingTime ? ` · ${hearing.hearingTime}` : ''}</p>
-        </div>
-        <div className="info-row">
-          <p className="lbl"><Gavel className="w-3 h-3" />Sudya</p>
-          <p className="val">{hearing.judge || '—'}</p>
-        </div>
-        <div className="info-row" style={{ gridColumn: '1 / -1' }}>
-          <p className="lbl"><Building2 className="w-3 h-3" />Sud</p>
-          <p className="val">{hearing.courtName || '—'}</p>
-        </div>
-      </div>
+      {/* v145 §3: DataStrip replaces box-in-box info-grid */}
+      <DataStrip>
+        <DataField label="Majlis sanasi" icon={CalendarDays} value={`${hearing.hearingDate}${hearing.hearingTime ? ` · ${hearing.hearingTime}` : ''}`} mono />
+        <DataField label="Sudya" icon={Gavel} value={hearing.judge} />
+        <DataField label="Sud" icon={Building2} value={hearing.courtName} span />
+      </DataStrip>
 
-      {/* Tomonlar (parties) — full-width row with plaintiff + defendant side by side */}
-      <div className="info-grid" style={{ marginTop: 12 }}>
-        <div className="info-row">
-          <p className="lbl"><Users className="w-3 h-3" />Da&apos;vogar</p>
-          <p className="val">{hearing.plaintiff || '—'}</p>
-        </div>
-        <div className="info-row">
-          <p className="lbl"><Users className="w-3 h-3" />Javobgar</p>
-          <p className="val">{hearing.defendant || '—'}</p>
-        </div>
-      </div>
+      {/* v145 §3: Parties as DataStrip */}
+      <DataStrip>
+        <DataField label="Da'vogar" icon={Users} value={hearing.plaintiff} />
+        <DataField label="Javobgar" icon={Users} value={hearing.defendant} />
+      </DataStrip>
     </article>
   )
 }
@@ -2615,22 +2517,27 @@ function CompanyInfoTab({
           {/* Rating card (prominent) — FIRST, right after hero */}
           {rating && (
             <article className="panel rating-card anim-fade-up">
-              <div className="rating-num">
-                {rating.score}
-                <span style={{ fontSize: 24, color: 'var(--text-3)' }}>/100</span>
+              {/* v145 §7f: Rating score as conic-gradient ring (reuses donut technique) */}
+              <div
+                className="rating-ring"
+                style={{
+                  background: `conic-gradient(var(--accent) ${rating.score * 3.6}deg, var(--surface-3) 0deg)`,
+                }}
+              >
+                <div className="rating-ring-inner">
+                  <div className="rating-num">
+                    {rating.score}
+                    <span style={{ fontSize: 24, color: 'var(--text-3)' }}>/100</span>
+                  </div>
+                </div>
               </div>
               <div className="rating-badge">{rating.category}</div>
               <div className="rating-sub">{ratingLabel(rating.category)} reyting</div>
-              <div className="info-grid" style={{ marginTop: 26, textAlign: 'left' }}>
-                <div className="info-row">
-                  <p className="lbl"><Receipt className="w-3 h-3" />Soliq to&apos;lovchi turi</p>
-                  <p className="val">{rating.taxpayerType || '—'}</p>
-                </div>
-                <div className="info-row" style={{ gridColumn: '1 / -1' }}>
-                  <p className="lbl"><MapPin className="w-3 h-3" />Hudud</p>
-                  <p className="val">{data?.company?.address || [rating.region, rating.district].filter(Boolean).join(', ') || '—'}</p>
-                </div>
-              </div>
+              {/* v145 §3: DataStrip replaces box-in-box info-grid */}
+              <DataStrip style={{ marginTop: 26 }}>
+                <DataField label="Soliq to'lovchi turi" icon={Receipt} value={rating.taxpayerType} />
+                <DataField label="Hudud" icon={MapPin} value={data?.company?.address || [rating.region, rating.district].filter(Boolean).join(', ')} span />
+              </DataStrip>
             </article>
           )}
 
@@ -2683,44 +2590,18 @@ function CompanyInfoTab({
                   <h3 className="card-head-title">Asosiy ma&apos;lumotlar</h3>
                 </div>
               </div>
-              <div className="info-grid">
-                <div className="info-row">
-                  <p className="lbl"><Building2 className="w-3 h-3" />To&apos;liq nomi</p>
-                  <p className="val">{data.company.officialName || data.company.shortName || '—'}</p>
-                </div>
-                <div className="info-row">
-                  <p className="lbl"><FileText className="w-3 h-3" />STIR</p>
-                  <p className="val mono">{formatTin(data.company.tin)}</p>
-                </div>
-                <div className="info-row" style={{ gridColumn: '1 / -1' }}>
-                  <p className="lbl"><MapPin className="w-3 h-3" />Manzil</p>
-                  <p className="val">{data.company.address || '—'}</p>
-                </div>
-                <div className="info-row">
-                  <p className="lbl"><Users className="w-3 h-3" />Rahbar</p>
-                  <p className="val">{data.company.director || '—'}</p>
-                </div>
-                <div className="info-row">
-                  <p className="lbl"><ShieldCheck className="w-3 h-3" />Holati</p>
-                  <p className="val">{data.company.status || '—'}</p>
-                </div>
-                <div className="info-row">
-                  <p className="lbl"><CalendarDays className="w-3 h-3" />Ro&apos;yxatdan olingan</p>
-                  <p className="val mono">{data.company.registeredDate || '—'}</p>
-                </div>
-                <div className="info-row">
-                  <p className="lbl"><Wallet className="w-3 h-3" />Ustav kapitali</p>
-                  <p className="val mono">{data.company.charterCapital || '—'}</p>
-                </div>
-                <div className="info-row">
-                  <p className="lbl"><Phone className="w-3 h-3" />Telefon</p>
-                  <p className="val mono">{data.company.phone || '—'}</p>
-                </div>
-                <div className="info-row">
-                  <p className="lbl"><Mail className="w-3 h-3" />Email</p>
-                  <p className="val mono">{data.company.email || '—'}</p>
-                </div>
-              </div>
+              {/* v145 §3: DataStrip replaces box-in-box info-grid */}
+              <DataStrip>
+                <DataField label="To'liq nomi" icon={Building2} value={data.company.officialName || data.company.shortName} />
+                <DataField label="STIR" icon={FileText} value={formatTin(data.company.tin)} mono />
+                <DataField label="Manzil" icon={MapPin} value={data.company.address} span />
+                <DataField label="Rahbar" icon={Users} value={data.company.director} />
+                <DataField label="Holati" icon={ShieldCheck} value={data.company.status} />
+                <DataField label="Ro'yxatdan olingan" icon={CalendarDays} value={data.company.registeredDate} mono />
+                <DataField label="Ustav kapitali" icon={Wallet} value={data.company.charterCapital} mono />
+                <DataField label="Telefon" icon={Phone} value={data.company.phone} mono />
+                <DataField label="Email" icon={Mail} value={data.company.email} mono />
+              </DataStrip>
             </article>
           )}
 
@@ -2733,20 +2614,12 @@ function CompanyInfoTab({
                   <h3 className="card-head-title">Faoliyat sohasi (OKED)</h3>
                 </div>
               </div>
-              <div className="info-grid">
-                <div className="info-row">
-                  <p className="lbl"><FileText className="w-3 h-3" />OKED kodi</p>
-                  <p className="val mono">{rating.okedCode || '—'}</p>
-                </div>
-                <div className="info-row">
-                  <p className="lbl"><Layers className="w-3 h-3" />Bo&apos;lim</p>
-                  <p className="val">{rating.okedSection || '—'}</p>
-                </div>
-                <div className="info-row" style={{ gridColumn: '1 / -1' }}>
-                  <p className="lbl"><Factory className="w-3 h-3" />Faoliyat nomi</p>
-                  <p className="val">{rating.okedName || rating.okedNameRu || rating.okedShortName || '—'}</p>
-                </div>
-              </div>
+              {/* v145 §3: DataStrip replaces box-in-box info-grid */}
+              <DataStrip>
+                <DataField label="OKED kodi" icon={FileText} value={rating.okedCode} mono />
+                <DataField label="Bo'lim" icon={Layers} value={rating.okedSection} />
+                <DataField label="Faoliyat nomi" icon={Factory} value={rating.okedName || rating.okedNameRu || rating.okedShortName} span />
+              </DataStrip>
             </article>
           )}
 
@@ -5333,7 +5206,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v144</p>
+                <p className="brand-sub">v145</p>
               </div>
             </div>
             <div className="header-right">
@@ -5821,9 +5694,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v144">
+        <footer className="app-footer" data-version="v145">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v144</div>
+            <div className="footer-text">Sud Billing Lookup v145</div>
           </div>
         </footer>
       </div>

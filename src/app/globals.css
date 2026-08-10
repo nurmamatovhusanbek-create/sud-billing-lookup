@@ -85,6 +85,15 @@
   --void-dark: #404040;        /* dark gray */
   --void-ink: #000000;         /* pure black (accent) */
 
+  /* v145 Radius tokens — single source of truth for all corner radii.
+     Replaces the 4 scattered exemption lists with named tokens.
+     See §2 of the UI redesign guide. */
+  --r-pill: 999px;    /* nav segments, buttons, search fields, status badges */
+  --r-card: 16px;     /* every top-level card/panel */
+  --r-field: 10px;    /* internal field cells, inputs, nested tiles */
+  --r-tag: 7px;       /* badges, chips, filter-chips, icon tiles */
+  --r-dot: 50%;       /* status dots, avatar-style marks */
+
   --surface: rgba(0,0,0,0.04);
   --surface-2: rgba(0,0,0,0.02);
   --surface-3: rgba(0,0,0,0.08);
@@ -302,23 +311,25 @@
 }
 
 /* ============================================================
-   BASE RESET — square corners EVERYWHERE
+   BASE RESET — square corners EVERYWHERE, with token-based exemptions
+   v145: Replaced hardcoded values with --r-* tokens. Added all missing
+   classes from the §1a/§7c gap audit so nothing renders square next to
+   rounded siblings. See UI redesign guide §2.
    ============================================================ */
 @layer base {
   * {
     box-sizing: border-box;
     border-radius: 0 !important;
   }
-  /* Exemptions: round elements that MUST stay circular */
+  /* Dots — circular marks only */
   .blob,
   .status-dot,
   .tor-badge .dot,
   .chip .dot,
   .copy-btn .dot {
-    border-radius: 50% !important;
+    border-radius: var(--r-dot) !important;
   }
-  /* v141 Step 1: Exempt buttons from the square-corners rule so pill-shaped
-     CTAs (border-radius: 9999px) can render. Tabela-inspired design. */
+  /* Pills — nav, buttons, search fields, status badges that read as pills */
   .btn-primary,
   .btn.btn-primary,
   .btn-ghost,
@@ -333,13 +344,16 @@
   .toggle-pair,
   .tor-badge,
   .theme-toggle,
-  .ext-link {
-    border-radius: 9999px !important;
+  .ext-link,
+  .korish-btn,
+  .icon-btn,
+  .btn-icon {
+    border-radius: var(--r-pill) !important;
   }
-  /* v141 Step 6: Rounded card corners (Tabela-inspired).
-     Panels, cards, and glass containers get a moderate border-radius (12px)
-     for a softer, more premium feel. NOT fully rounded — keeps data-density
-     usable. Badges and tags keep a smaller radius (6px). */
+  /* Cards — every top-level card/panel. v145: added missing classes from
+     §1a gap audit: action-card, detail-toolbar, skel-card, trend-case-card.
+     skel-card MUST match its real counterpart (bill-card) since it's a
+     loading placeholder. */
   .panel,
   .glass,
   .bento,
@@ -368,16 +382,33 @@
   .folder-nav,
   .folder-panel,
   .inn-bar,
-  .filter-bar {
-    border-radius: 12px !important;
+  .filter-bar,
+  .action-card,
+  .detail-toolbar,
+  .skel-card,
+  .trend-case-card {
+    border-radius: var(--r-card) !important;
   }
-  /* Smaller radius for badges, chips, and tags */
+  /* Fields — internal field cells, nested tiles, inputs.
+     v145: Added money-cell, info-row, founder-row from §1a/§7c gap audit.
+     These sit inside cards and were rendering square next to rounded siblings. */
+  .money-cell,
+  .info-row,
+  .founder-row {
+    border-radius: var(--r-field) !important;
+  }
+  /* Tags — badges, chips, filter-chips, icon tiles.
+     v145: Added rating-badge, card-head-icon, brand-mark from §1a/§7c gap audit.
+     brand-mark was separately forced to 0 — now joins the tag system. */
   .badge,
   .chip:not(.sample-chip),
   .filter-chip,
   .ft-count,
-  .copy-btn {
-    border-radius: 6px !important;
+  .copy-btn,
+  .rating-badge,
+  .card-head-icon,
+  .brand-mark {
+    border-radius: var(--r-tag) !important;
   }
   *, *::before, *::after { box-sizing: border-box; }
   html {
@@ -421,7 +452,7 @@
 }
 .blob {
   position: absolute;
-  border-radius: 50%;
+  border-radius: var(--r-dot);
   filter: blur(80px);
   opacity: 0.12;
   background: var(--blob-color);
@@ -483,7 +514,8 @@
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand-mark {
   width: 38px; height: 38px;
-  border-radius: 0 !important;
+  /* v145: was border-radius: 0 !important — now uses --r-tag token via the
+     base reset exemption list. Joins the system instead of being a one-off. */
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   background: var(--accent);
@@ -533,7 +565,7 @@
 .tor-badge:hover { background: var(--surface); color: var(--text-1); border-color: var(--accent); }
 .status-dot, .tor-badge .dot {
   width: 6px; height: 6px;
-  border-radius: 50%;
+  border-radius: var(--r-dot);
   background: var(--accent);
   animation: pulse 2s ease-in-out infinite;
   flex-shrink: 0;
@@ -619,7 +651,7 @@
   overflow-x: auto;
   scrollbar-width: none;
   /* v141 Step 3: Pill-shaped tab container */
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
 }
 .liquid-rail::-webkit-scrollbar, .tabs-bar::-webkit-scrollbar { display: none; }
 
@@ -1003,15 +1035,14 @@
   height: 52px;
   padding: 0 20px 0 48px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.5);
+  background: var(--panel-bg);
   color: var(--text-1);
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-size: 14.5px;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
-[data-theme='dark'] .console-input,
-[data-theme='dark'] .input { background: rgba(255,255,255,0.04); }
+/* v145 §7d: Removed manual dark-mode patch — --panel-bg auto-swaps in dark theme */
 .console-input::placeholder, .input::placeholder { color: var(--text-3); }
 .console-input:focus, .input:focus {
   border-color: var(--accent);
@@ -1048,7 +1079,7 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   /* v141 Step 1: Pill-shaped CTA buttons (Tabela-inspired) */
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
 }
 .btn-primary:hover, .btn.btn-primary:hover {
   transform: translateY(-2px);
@@ -1105,7 +1136,7 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   /* v141 Step 1: Pill-shaped ghost buttons to match primary */
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
 }
 .btn-ghost:hover {
   background: var(--accent-dim);
@@ -1160,7 +1191,7 @@
   color: var(--accent);
   background: var(--accent-dim);
 }
-.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+.chip .dot { width: 6px; height: 6px; border-radius: var(--r-dot); background: currentColor; opacity: 0.6; }
 
 /* ============================================================
    TOGGLE PAIR — STIR/Kvitansiya mode toggle (v143: pill-shaped)
@@ -1173,7 +1204,7 @@
   background: var(--surface-2);
   margin-top: 22px;
   /* v143: pill-shaped container to match tabs */
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
 }
 .toggle-btn {
   padding: 9px 18px;
@@ -1188,7 +1219,7 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   /* v143: pill-shaped buttons */
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
 }
 .toggle-btn.is-active {
   background: var(--accent);
@@ -1262,13 +1293,13 @@
 @media (min-width: 640px) { .summary-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1000px) { .summary-grid { grid-template-columns: repeat(6, 1fr); } }
 .summary-cell {
-  background: rgba(255,255,255,0.5);
+  background: var(--panel-bg);
   border: 1px solid var(--border-soft);
   padding: 16px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-[data-theme='dark'] .summary-cell { background: rgba(255,255,255,0.04); }
+/* v145 §7d: Removed manual dark-mode patch — --panel-bg auto-swaps */
 .summary-cell .lbl {
   font-size: 9px;
   text-transform: uppercase;
@@ -1448,12 +1479,103 @@
 }
 @media (min-width: 560px) { .money-grid { grid-template-columns: repeat(5, 1fr); } }
 
+/* ============================================================
+   v145 §3: DataStrip — shared primitive replacing box-in-box pattern.
+   One bordered strip with hairline dividers, not individual boxes per field.
+   Closes §7a (nowrap-squeeze) and §7b (dangling-empty-cell) by construction.
+   ============================================================ */
+.data-strip {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  margin-bottom: 16px;
+  background: var(--surface-2);
+}
+.data-field {
+  flex: 1 1 0;
+  min-width: 0; /* §7a: prevents nowrap from forcing the row wider */
+  padding: 12px 14px;
+  border-left: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.data-field:first-child {
+  border-left: none;
+}
+/* §7b: span full width — starts a new row in flex-wrap */
+.data-field.is-span {
+  flex-basis: 100%;
+  border-left: none;
+  border-top: 1px solid var(--border-soft);
+}
+.data-field:first-child.is-span {
+  border-top: none;
+}
+.data-field-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  font-weight: 600;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.data-field-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 0.7;
+}
+.data-field-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+  line-height: 1.3;
+  word-break: break-word;
+}
+.data-field-value.mono {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 15px;
+}
+.data-field-sub {
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+/* Tone drives text color only — no per-cell background */
+.data-field.tone-paid .data-field-value { color: var(--accent); font-weight: 700; }
+.data-field.tone-unpaid .data-field-value { color: var(--text-2); }
+.data-field.tone-accent .data-field-value { color: var(--accent); font-weight: 700; }
+/* Dark mode: ensure hairline dividers are visible */
+[data-theme='dark'] .data-strip {
+  background: rgba(255,255,255,0.02);
+}
+[data-theme='dark'] .data-field {
+  border-left-color: rgba(255,255,255,0.06);
+}
+[data-theme='dark'] .data-field.is-span {
+  border-top-color: rgba(255,255,255,0.06);
+}
+
 .money-cell {
   padding: 12px 13px;
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
   transition: border-color 0.15s ease, background 0.15s ease;
   position: relative;
+  /* v145 §7a fix: min-width:0 prevents nowrap value text from forcing the
+     grid column (and therefore the whole card) wider instead of taller.
+     The proper structural fix is DataStrip (Step 2), but this stopgap
+     closes the bug now. */
+  min-width: 0;
 }
 .money-cell:hover { border-color: var(--border); }
 .money-cell .label, .money-cell .lbl {
@@ -1775,7 +1897,7 @@
   gap: 12px;
 }
 .company-tile {
-  background: rgba(255,255,255,0.5);
+  background: var(--panel-bg);
   border: 1px solid var(--border);
   padding: 17px;
   cursor: pointer;
@@ -1784,7 +1906,7 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-[data-theme='dark'] .company-tile { background: rgba(255,255,255,0.04); }
+/* v145 §7d: Removed manual dark-mode patch — --panel-bg auto-swaps */
 .company-tile:hover {
   border-color: var(--accent);
   transform: translateY(-3px);
@@ -1844,6 +1966,26 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+/* v145 §7f: Conic-gradient rating ring (reuses donut technique from Stats tab) */
+.rating-ring {
+  width: 140px;
+  height: 140px;
+  border-radius: var(--r-dot);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  position: relative;
+}
+.rating-ring-inner {
+  width: 112px;
+  height: 112px;
+  border-radius: var(--r-dot);
+  background: var(--panel-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .rating-num, .rating-score {
   font-family: var(--font-jakarta), sans-serif;
@@ -1923,7 +2065,7 @@
 }
 @media (min-width: 640px) { .quick-grid, .actions-grid { grid-template-columns: repeat(4, 1fr); } }
 .quick-tile, .action-card {
-  background: rgba(255,255,255,0.5);
+  background: var(--panel-bg);
   border: 1px solid var(--border);
   padding: 18px 15px;
   display: flex;
@@ -2392,51 +2534,51 @@
 
 .folder-nav {
   display: inline-flex;
-  align-items: flex-end;
-  gap: 0;
+  align-items: center; /* v145: was flex-end for trapezoids, now center for pills */
+  gap: 4px; /* v145: was 0 (trapezoids overlapped), now 4px like main nav */
   min-width: max-content;
   position: relative;
-  padding: 0 4px;
+  padding: 6px; /* v145: padding for pill container */
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
 }
 
+/* v145 §6: Reconciled Statistika folder-tabs — replaced trapezoidal clip-path
+   with pill-shaped tabs matching the main nav. One shape language, not two. */
 .folder-tab {
   position: relative;
   z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  height: 58px;
-  padding: 0 44px 0 40px;
-  border: 1px solid var(--border);
-  border-bottom: none;
+  gap: 7px;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--border-soft);
   background: var(--surface-2);
   color: var(--text-2);
   cursor: pointer;
   font-family: var(--font-jetbrains), ui-monospace, monospace;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   white-space: nowrap;
-  /* trapezoidal silhouette — wider at top, narrower at bottom */
-  clip-path: polygon(0 0, 100% 0, 82% 100%, 18% 100%);
-  -webkit-clip-path: polygon(0 0, 100% 0, 82% 100%, 18% 100%);
-  /* overlap each tab by ~50px so the right slope nestles under the next tab */
-  margin-right: -50px;
+  /* v145: pill-shaped (was trapezoidal clip-path) */
+  border-radius: var(--r-pill);
   transition:
     transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
     background 0.25s ease,
     color 0.25s ease,
     box-shadow 0.25s ease;
 }
-.folder-tab:nth-child(1) { z-index: 4; }
-.folder-tab:nth-child(2) { z-index: 3; }
-.folder-tab:nth-child(3) { z-index: 2; }
+/* v145: No more z-index stacking or overlap — pills sit side by side */
+.folder-tab:nth-child(1),
+.folder-tab:nth-child(2),
+.folder-tab:nth-child(3),
 .folder-tab:nth-child(4) { z-index: 1; }
-.folder-tab.is-active { z-index: 10; }
-.folder-tab:hover { z-index: 9; }
-.folder-tab.is-active:hover { z-index: 10; }
+.folder-tab.is-active { z-index: 2; }
 
 .folder-tab:hover:not(.is-active) {
   transform: translateY(-2px);
@@ -2446,8 +2588,9 @@
 .folder-tab.is-active {
   background: var(--accent);
   color: var(--void);
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-hover);
+  /* v145: was translateY(-4px) for trapezoid float, now subtle shadow like main nav */
+  transform: none;
+  box-shadow: 0 4px 12px -2px rgba(0,0,0,0.25), 0 8px 24px -6px rgba(0,0,0,0.15);
 }
 .folder-tab.is-active svg { opacity: 1; }
 .folder-tab svg {
@@ -2568,7 +2711,7 @@
   color: var(--void);
   flex-shrink: 0;
   /* v143: rounded icon to match design */
-  border-radius: 10px;
+  border-radius: var(--r-field);
 }
 .company-banner .cb-icon svg { width: 16px; height: 16px; }
 .company-banner .cb-text { min-width: 0; flex: 1; }
@@ -4268,4 +4411,264 @@
   margin-top: 8px;
   width: 100%;
   justify-content: center;
+}
+
+/* ============================================================
+   v145 §5: ReceiptView — stylized cheque/receipt for bill details.
+   The "signature element" — vertical ticket with serrated edges,
+   barcode-style numbers, dashed dividers. Monospace-first.
+   ============================================================ */
+.receipt-view {
+  margin: 12px 0 4px;
+  position: relative;
+}
+.receipt-body {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-top: none;
+  border-bottom: none;
+  padding: 20px 18px 16px;
+}
+/* Serrated edges — repeating triangle mask */
+.receipt-edge {
+  height: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  position: relative;
+}
+.receipt-edge-top {
+  border-bottom: none;
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  -webkit-mask-image: linear-gradient(135deg, transparent 4px, black 4px),
+    linear-gradient(45deg, transparent 4px, black 4px);
+  -webkit-mask-size: 8px 8px;
+  -webkit-mask-repeat: repeat-x;
+  -webkit-mask-position: bottom;
+  mask-image: linear-gradient(135deg, transparent 4px, black 4px),
+    linear-gradient(45deg, transparent 4px, black 4px);
+  mask-size: 8px 8px;
+  mask-repeat: repeat-x;
+  mask-position: bottom;
+}
+.receipt-edge-bottom {
+  border-top: none;
+  border-radius: 0 0 var(--r-card) var(--r-card);
+  -webkit-mask-image: linear-gradient(135deg, black 4px, transparent 4px),
+    linear-gradient(45deg, black 4px, transparent 4px);
+  -webkit-mask-size: 8px 8px;
+  -webkit-mask-repeat: repeat-x;
+  -webkit-mask-position: top;
+  mask-image: linear-gradient(135deg, black 4px, transparent 4px),
+    linear-gradient(45deg, black 4px, transparent 4px);
+  mask-size: 8px 8px;
+  mask-repeat: repeat-x;
+  mask-position: top;
+}
+/* Header */
+.receipt-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px dashed var(--border-soft);
+}
+.receipt-header-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.receipt-header-text { flex: 1; min-width: 0; }
+.receipt-title {
+  font-family: var(--font-jakarta), sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-1);
+}
+.receipt-sub {
+  font-size: 10px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+/* Barcode */
+.receipt-barcode {
+  text-align: center;
+  margin-bottom: 16px;
+  padding: 12px 0;
+  border-bottom: 2px dashed var(--border-soft);
+}
+.receipt-barcode-bars {
+  display: inline-flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 38px;
+  margin-bottom: 6px;
+}
+.receipt-bar {
+  width: 3px;
+  background: var(--text-1);
+  min-height: 8px;
+}
+.receipt-barcode-number {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-1);
+}
+/* Meta rows */
+.receipt-meta {
+  margin-bottom: 14px;
+}
+.receipt-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0;
+  gap: 12px;
+}
+.receipt-meta-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  font-weight: 600;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  flex-shrink: 0;
+}
+.receipt-meta-value {
+  font-size: 12px;
+  color: var(--text-1);
+  font-weight: 500;
+  text-align: right;
+}
+.receipt-meta-value-wrap {
+  word-break: break-word;
+  text-align: right;
+  max-width: 60%;
+}
+.receipt-meta-value.mono {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+/* Amount row — large, right-aligned */
+.receipt-amount-row {
+  border-top: 1px solid var(--border-soft);
+  margin-top: 4px;
+  padding-top: 10px;
+}
+.receipt-amount {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+}
+.receipt-amount-unit {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+/* Claim case number */
+.receipt-claim {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: var(--surface-3);
+  border-radius: var(--r-field);
+}
+.receipt-claim-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.receipt-claim-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: 0.04em;
+}
+/* Line items */
+.receipt-items {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 2px dashed var(--border-soft);
+}
+.receipt-items-header {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  font-weight: 600;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  margin-bottom: 8px;
+}
+.receipt-divider {
+  border-top: 1px dashed var(--border-soft);
+  margin: 8px 0;
+}
+.receipt-item {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border-soft);
+}
+.receipt-item:last-child { border-bottom: none; }
+.receipt-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.receipt-item-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: 0.02em;
+}
+.receipt-item-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.receipt-item-amount {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.receipt-item-unit {
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+.receipt-item-actions {
+  display: flex;
+  gap: 6px;
+}
+/* Footer */
+.receipt-footer {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 2px dashed var(--border-soft);
+  text-align: center;
+  font-size: 9px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+/* Dark mode adjustments */
+[data-theme='dark'] .receipt-body {
+  background: rgba(255,255,255,0.03);
+}
+[data-theme='dark'] .receipt-edge {
+  background: rgba(255,255,255,0.03);
+}
+[data-theme='dark'] .receipt-claim {
+  background: rgba(255,255,255,0.05);
 }

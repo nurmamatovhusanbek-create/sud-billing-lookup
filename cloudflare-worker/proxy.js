@@ -99,23 +99,26 @@ const sudProxyWorker = {
           headers.set(k, v)
         }
       }
-      // Full Chrome 124 on Windows fingerprint
-      headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36')
-      headers.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7')
-      headers.set('Accept-Language', 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,uz;q=0.6')
+      // Full Chrome 151 on Windows fingerprint — matches what my.sud.uz browser sends.
+      // v148: Changed Origin from target.origin to 'https://my.sud.uz' — jadval.sud.uz
+      // checks Origin header and only returns data when Origin is my.sud.uz.
+      // v148: Changed Sec-Fetch-Site from 'none' to 'same-site' — matches browser.
+      // v148: Changed Accept to JSON (was HTML) — matches my.sud.uz API calls.
+      headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36')
+      headers.set('Accept', 'application/json, text/plain, */*')
+      headers.set('Accept-Language', 'en-GB,en;q=0.5')
       headers.set('Accept-Encoding', 'gzip, deflate, br')
       headers.set('Cache-Control', 'no-cache')
       headers.set('Pragma', 'no-cache')
-      headers.set('Sec-Ch-Ua', '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"')
+      headers.set('Sec-Ch-Ua', '"Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"')
       headers.set('Sec-Ch-Ua-Mobile', '?0')
       headers.set('Sec-Ch-Ua-Platform', '"Windows"')
-      headers.set('Sec-Fetch-Dest', 'document')
-      headers.set('Sec-Fetch-Mode', 'navigate')
-      headers.set('Sec-Fetch-Site', 'none')
-      headers.set('Sec-Fetch-User', '?1')
-      headers.set('Upgrade-Insecure-Requests', '1')
-      headers.set('Referer', `${target.origin}/`)
-      headers.set('Origin', target.origin)
+      headers.set('Sec-Fetch-Dest', 'empty')
+      headers.set('Sec-Fetch-Mode', 'cors')
+      headers.set('Sec-Fetch-Site', 'same-site')
+      headers.set('Sec-GPC', '1')
+      headers.set('Origin', 'https://my.sud.uz')
+      headers.set('Referer', 'https://my.sud.uz/')
 
       const response = await fetch(targetUrl, {
         method: request.method,

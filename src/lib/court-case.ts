@@ -209,9 +209,10 @@ async function searchCourtCasesInternal(
       try {
         const res = await fetch(proxyUrl, {
           headers: {
-            Accept: 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            Referer: 'https://my.sud.uz/court-case',
+            Accept: 'application/json, text/plain, */*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+            'Origin': 'https://my.sud.uz',
+            'Referer': 'https://my.sud.uz/',
           },
           signal: AbortSignal.timeout(10000),
         })
@@ -222,9 +223,6 @@ async function searchCourtCasesInternal(
           throw new Error(`HTTP ${res.status}`)
         }
         const text = await res.text()
-        // v140: DO NOT treat "Иш топилмади" as definitive — jadval.sud.uz
-        // returns this text when IP-blocking direct access, but CF Workers
-        // get the full data. Only treat HTTP 404/410 as definitive not-found.
         const data = JSON.parse(text)
         const items = Array.isArray(data) ? data : (data.data || [])
         return items.map(mapper)
@@ -261,9 +259,11 @@ async function searchCourtCasesInternal(
       const retryPromises = proxyUrls.map(async ({ url: proxyUrl }) => {
         const res = await fetch(proxyUrl, {
           headers: {
-            Accept: 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            Referer: 'https://my.sud.uz/court-case',
+            Accept: 'application/json, text/plain, */*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+            'Origin': 'https://my.sud.uz',
+            'Referer': 'https://my.sud.uz/',
+            'Referer': 'https://my.sud.uz/',
           },
           signal: AbortSignal.timeout(15000),
         })
@@ -295,9 +295,11 @@ async function searchCourtCasesInternal(
         const finalPromises = allWorkers.map(async (w) => {
           const res = await fetch(w + url, {
             headers: {
-              Accept: 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              Referer: 'https://my.sud.uz/court-case',
+              Accept: 'application/json, text/plain, */*',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+            'Origin': 'https://my.sud.uz',
+            'Referer': 'https://my.sud.uz/',
+              'Referer': 'https://my.sud.uz/',
             },
             signal: AbortSignal.timeout(20000),
           })
@@ -645,7 +647,7 @@ async function fetchJadvalApiDetails(courtTypeUpper: string, encodedNumber: stri
   const workerUrl = getCfWorkerUrl(url)
   try {
     const res = await fetch(workerUrl, {
-      headers: { Accept: 'application/json', Referer: 'https://my.sud.uz/court-case' },
+      headers: { Accept: 'application/json, text/plain, */*', 'Origin': 'https://my.sud.uz', 'Referer': 'https://my.sud.uz/' },
       signal: AbortSignal.timeout(8000),
     })
     // Guard against non-200 responses — jadvalapi returns 400 Bad Request for
@@ -681,7 +683,7 @@ async function fetchJadvalDetails(courtType: CourtType, encodedNumber: string): 
   const workerUrl = getCfWorkerUrl(endpoint)
   try {
     const res = await fetch(workerUrl, {
-      headers: { Accept: 'application/json', Referer: 'https://my.sud.uz/court-case' },
+      headers: { Accept: 'application/json, text/plain, */*', 'Origin': 'https://my.sud.uz', 'Referer': 'https://my.sud.uz/' },
       signal: AbortSignal.timeout(8000),
     })
     if (!res.ok) {

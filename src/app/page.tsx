@@ -1850,7 +1850,7 @@ function UpcomingHearingCard({
           {hearing.hearingDate && (() => {
             const parts = hearing.hearingDate.split('.')
             const day = parts[0] || ''
-            const month = parts[1] ? TREND_MONTH_ABBR[+month - 1] ?? parts[1] : ''
+            const month = parts[1] ? TREND_MONTH_ABBR[+parts[1] - 1] ?? parts[1] : ''
             return (
               <div className="docket-date">
                 <span className="docket-day">{day}</span>
@@ -5218,7 +5218,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v147</p>
+                <p className="brand-sub">v149</p>
               </div>
             </div>
             <div className="header-right">
@@ -5706,9 +5706,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v147">
+        <footer className="app-footer" data-version="v149">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v147</div>
+            <div className="footer-text">Sud Billing Lookup v149</div>
           </div>
         </footer>
       </div>

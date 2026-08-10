@@ -1952,12 +1952,14 @@
   width: 112px;
   height: 112px;
   border-radius: var(--r-dot);
-  background: var(--panel-bg);
+  /* v148: was var(--panel-bg) — nearly transparent in dark mode, causing the
+     conic-gradient ring to show through and make the whole circle white.
+     Now uses --void (solid black in dark, solid white in light) for contrast. */
+  background: var(--void);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* v146 §5.1: overflow hidden as hard backstop */
   overflow: hidden;
   padding: 4px;
 }
@@ -3600,8 +3602,12 @@
   content: '';
   position: absolute;
   inset: 26px;
-  background: var(--panel-bg);
+  /* v148: was var(--panel-bg) — nearly transparent in dark mode, causing ring
+     to show through. Now uses --void for solid contrast in both themes. */
+  background: var(--void);
   z-index: 1;
+  /* v148: was missing border-radius — created a square inside the circle */
+  border-radius: var(--r-dot);
 }
 .donut-center {
   position: absolute;
@@ -4437,6 +4443,9 @@
    The "signature element" — vertical ticket with serrated edges,
    barcode-style numbers, dashed dividers. Monospace-first.
    ============================================================ */
+/* v148: Simplified receipt — removed fragile serrated edge pieces that
+   caused misalignment. One continuous rounded card with dashed dividers
+   inside conveys the "receipt" identity cleanly. */
 .receipt-view {
   margin: 12px 0 4px;
   position: relative;
@@ -4444,46 +4453,11 @@
 .receipt-body {
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
-  border-top: none;
-  border-bottom: none;
   padding: 20px 18px 16px;
   border-radius: var(--r-card);
 }
-/* Serrated edges — repeating triangle mask */
-.receipt-edge {
-  height: 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
-  position: relative;
-}
-.receipt-edge-top {
-  border-bottom: none;
-  border-radius: var(--r-card) var(--r-card) 0 0;
-  -webkit-mask-image: linear-gradient(135deg, transparent 4px, black 4px),
-    linear-gradient(45deg, transparent 4px, black 4px);
-  -webkit-mask-size: 8px 8px;
-  -webkit-mask-repeat: repeat-x;
-  -webkit-mask-position: bottom;
-  mask-image: linear-gradient(135deg, transparent 4px, black 4px),
-    linear-gradient(45deg, transparent 4px, black 4px);
-  mask-size: 8px 8px;
-  mask-repeat: repeat-x;
-  mask-position: bottom;
-}
-.receipt-edge-bottom {
-  border-top: none;
-  border-radius: 0 0 var(--r-card) var(--r-card);
-  -webkit-mask-image: linear-gradient(135deg, black 4px, transparent 4px),
-    linear-gradient(45deg, black 4px, transparent 4px);
-  -webkit-mask-size: 8px 8px;
-  -webkit-mask-repeat: repeat-x;
-  -webkit-mask-position: top;
-  mask-image: linear-gradient(135deg, black 4px, transparent 4px),
-    linear-gradient(45deg, black 4px, transparent 4px);
-  mask-size: 8px 8px;
-  mask-repeat: repeat-x;
-  mask-position: top;
-}
+/* Edges removed — body is now one continuous card */
+.receipt-edge, .receipt-edge-top, .receipt-edge-bottom { display: none; }
 /* Header */
 .receipt-header {
   display: flex;

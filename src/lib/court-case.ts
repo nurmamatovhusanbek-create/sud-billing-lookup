@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { execSync } from 'child_process'
 import ZAI from 'z-ai-web-dev-sdk'
 
 /**
@@ -87,6 +88,54 @@ import type { CourtType, SearchMode, CourtCase, FullCaseData } from './court-cas
 export { CASE_STATUSES, HEARING_STATUSES, COURT_TYPE_LABELS } from './court-case-types'
 
 // ---- API calls (NO auth, NO captcha needed — these are public endpoints) ----
+
+/**
+ * v149: curl-based fetch for jadval.sud.uz.
+ *
+ * Problem: jadval.sud.uz does TLS fingerprinting (JA3/JA4). Node.js's fetch
+ * (undici) and CF Workers both have non-browser TLS fingerprints, so
+ * jadval.sud.uz returns "Ишлар топилмади" (not found) to them. Only real
+ * browsers (Chrome) get data.
+ *
+ * Fix: Use system `curl` as a child process. curl uses OpenSSL which has a
+ * different TLS fingerprint that's closer to a browser. The user's machine
+ * can reach jadval.sud.uz (the browser proves it), so curl from the same
+ * machine should also work.
+ *
+ * This is ONLY used for jadval.sud.uz (not jadvalapi.sud.uz, which doesn't
+ * do TLS fingerprinting).
+ */
+function curlFetch(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const args = [
+        '--silent', '--show-error',
+        '--max-time', '12',
+        '--compressed',
+        '-H', 'Accept: application/json, text/plain, */*',
+        '-H', 'Accept-Language: en-GB,en;q=0.5',
+        '-H', 'Origin: https://my.sud.uz',
+        '-H', 'Referer: https://my.sud.uz/',
+        '-H', 'Sec-Fetch-Dest: empty',
+        '-H', 'Sec-Fetch-Mode: cors',
+        '-H', 'Sec-Fetch-Site: same-site',
+        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+        '-H', 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"',
+        '-H', 'sec-ch-ua-mobile: ?0',
+        '-H', 'sec-ch-ua-platform: "Windows"',
+        '--', url,
+      ]
+      const result = execSync(`curl ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, {
+        timeout: 15000,
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024, // 10MB
+      })
+      resolve(result)
+    } catch (e: any) {
+      reject(new Error(e?.message || 'curl failed'))
+    }
+  })
+}
 
 /**
  * v140: Server-side in-memory cache for court-case search results.
@@ -199,11 +248,11 @@ async function searchCourtCasesInternal(
     // Direct fetch as last resort in the parallel race
     proxyUrls.push({ url, label: 'direct' })
 
+    // v149: For jadval.sud.uz, ALSO add curl-based fetch (bypasses TLS fingerprinting)
+    const isJadvalSudUz = url.includes('jadval.sud.uz')
+
     // v140: PARALLEL RACE with BEST-OF fallback.
     // Fire ALL proxies simultaneously. Take the first valid response.
-    // If the first response has < 20 cases (partial), wait up to 8s more for
-    // other proxies — they might return more cases (jadvalapi sometimes returns
-    // 6, other times 100, depending on server load/rate limiting).
     // 10s timeout per request.
     const fetchPromises = proxyUrls.map(async ({ url: proxyUrl, label }) => {
       try {
@@ -231,6 +280,17 @@ async function searchCourtCasesInternal(
         throw new Error(msg)
       }
     })
+
+    // v149: For jadval.sud.uz, ALSO try curl (bypasses TLS fingerprinting)
+    if (isJadvalSudUz) {
+      fetchPromises.push((async () => {
+        const text = await curlFetch(url)
+        const data = JSON.parse(text)
+        const items = Array.isArray(data) ? data : (data.data || [])
+        console.log(`[court-case] curl fetch got ${items.length} cases from ${url}`)
+        return items.map(mapper)
+      })())
+    }
 
     // v140: BEST-OF strategy — wait for all proxies to settle, then take the
     // result with the MOST cases. This handles the case where one proxy returns

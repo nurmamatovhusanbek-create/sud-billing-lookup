@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { execSync } from 'child_process'
+import { spawn } from 'child_process'
 import ZAI from 'z-ai-web-dev-sdk'
 
 /**
@@ -107,33 +107,51 @@ export { CASE_STATUSES, HEARING_STATUSES, COURT_TYPE_LABELS } from './court-case
  */
 function curlFetch(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    try {
-      const args = [
-        '--silent', '--show-error',
-        '--max-time', '12',
-        '--compressed',
-        '-H', 'Accept: application/json, text/plain, */*',
-        '-H', 'Accept-Language: en-GB,en;q=0.5',
-        '-H', 'Origin: https://my.sud.uz',
-        '-H', 'Referer: https://my.sud.uz/',
-        '-H', 'Sec-Fetch-Dest: empty',
-        '-H', 'Sec-Fetch-Mode: cors',
-        '-H', 'Sec-Fetch-Site: same-site',
-        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-        '-H', 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"',
-        '-H', 'sec-ch-ua-mobile: ?0',
-        '-H', 'sec-ch-ua-platform: "Windows"',
-        '--', url,
-      ]
-      const result = execSync(`curl ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, {
-        timeout: 15000,
-        encoding: 'utf-8',
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-      })
-      resolve(result)
-    } catch (e: any) {
-      reject(new Error(e?.message || 'curl failed'))
-    }
+    const args = [
+      '--silent', '--show-error',
+      '--max-time', '12',
+      '--compressed',
+      '-H', 'Accept: application/json, text/plain, */*',
+      '-H', 'Accept-Language: en-GB,en;q=0.5',
+      '-H', 'Origin: https://my.sud.uz',
+      '-H', 'Referer: https://my.sud.uz/',
+      '-H', 'Sec-Fetch-Dest: empty',
+      '-H', 'Sec-Fetch-Mode: cors',
+      '-H', 'Sec-Fetch-Site: same-site',
+      '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+      '-H', 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"',
+      '-H', 'sec-ch-ua-mobile: ?0',
+      '-H', 'sec-ch-ua-platform: "Windows"',
+      '--', url,
+    ]
+
+    // v149: Use spawn (async, non-blocking, no shell) instead of execSync.
+    // execSync goes through cmd.exe on Windows which breaks shell quoting.
+    // spawn passes args directly to curl — no shell, no quoting issues.
+    const child = spawn('curl', args, {
+      timeout: 15000,
+      windowsHide: true,
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.on('data', (data) => { stdout += data.toString() })
+    child.stderr.on('data', (data) => { stderr += data.toString() })
+
+    child.on('error', (err) => {
+      console.error(`[court-case] curl spawn error: ${err.message}`)
+      reject(new Error(`curl spawn failed: ${err.message}`))
+    })
+
+    child.on('close', (code) => {
+      if (code === 0 && stdout.length > 0) {
+        resolve(stdout)
+      } else {
+        console.error(`[court-case] curl exit code ${code}, stderr: ${stderr.slice(0, 200)}`)
+        reject(new Error(`curl exit ${code}: ${stderr.slice(0, 100) || 'no output'}`))
+      }
+    })
   })
 }
 

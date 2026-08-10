@@ -5333,7 +5333,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v143</p>
+                <p className="brand-sub">v144</p>
               </div>
             </div>
             <div className="header-right">
@@ -5821,9 +5821,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v143">
+        <footer className="app-footer" data-version="v144">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v143</div>
+            <div className="footer-text">Sud Billing Lookup v144</div>
           </div>
         </footer>
       </div>

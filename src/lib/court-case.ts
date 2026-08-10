@@ -29,21 +29,14 @@ const FALLBACK_WORKERS = [
   'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
 ]
 
-// v139: Public CORS proxies (DIFFERENT infrastructure than CF Workers).
-// When ALL CF Workers fail due to a network-level outage (DNS blip, sandbox
-// connectivity issue), these public proxies provide a last-resort fallback.
-// They have different IP ranges and DNS, so they work when workers.dev is
-// unreachable. Note: some need encodeURIComponent, some don't.
-const PUBLIC_CORS_PROXIES = [
-  { prefix: 'https://proxy.cors.sh/', needsEncoding: false },
-  { prefix: 'https://api.allorigins.win/raw?url=', needsEncoding: true },
-  { prefix: 'https://corsproxy.io/?url=', needsEncoding: true },
-  { prefix: 'https://api.codetabs.com/v1/proxy/?quest=', needsEncoding: false },
-]
+// v144: Removed all public CORS proxies (cors.sh, allorigins, corsproxy.io,
+// codetabs). User requested: ONLY CF Workers, no other proxies.
+const PUBLIC_CORS_PROXIES: { prefix: string; needsEncoding: boolean }[] = []
 
 /**
  * Build the full list of proxy URLs to try for a given target URL.
- * Order: CF Workers (env or fallback) → public CORS proxies → direct.
+ * v144: CF Workers ONLY (no public CORS proxies, no direct fetch).
+ * Order: CF Workers (env or fallback) only.
  * The direct fetch is the last resort — it works when the sandbox has direct
  * connectivity to the origin (sometimes it does, sometimes it's IP-blocked).
  */
@@ -68,14 +61,14 @@ function buildProxyChain(targetUrl: string): { url: string; label: string }[] {
     chain.push({ url: w + targetUrl, label: 'CF Worker' })
   }
 
-  // 2. Public CORS proxies
+  // 2. Public CORS proxies (v144: empty list — removed per user request)
   for (const p of PUBLIC_CORS_PROXIES) {
     const proxiedUrl = p.needsEncoding ? p.prefix + encodeURIComponent(targetUrl) : p.prefix + targetUrl
     chain.push({ url: proxiedUrl, label: 'CORS proxy' })
   }
 
-  // 3. Direct fetch (last resort — may be IP-blocked, but sometimes works)
-  chain.push({ url: targetUrl, label: 'direct' })
+  // v144: Removed direct fetch — user wants ONLY CF Workers.
+  // If all workers fail, the retry logic handles it.
 
   return chain
 }

@@ -19,6 +19,39 @@ const SITE_KEY = 'site_bbdb0625df8a200e73f37ebccf0c62ac'
 const CAPTCHA_API = 'https://recaptcha.sud.uz'
 const BILLING_API = 'https://billing.sud.uz'
 
+// v144: CF Worker fallback list — MOVED HERE (was at line 912, after the code
+// that uses it, causing "Cannot access 'FALLBACK_WORKERS' before initialization"
+// ReferenceError at module load time). Must be defined BEFORE buildCaptchaPool().
+//
+// v144: Removed all non-worker proxies (cors.sh, allorigins, corsproxy.io,
+// codetabs, thingproxy). User requested: ONLY CF Workers, no other proxies.
+const FALLBACK_WORKERS = [
+  'https://broad-field-f2b0.uzwebfox.workers.dev/',
+  'https://wild-hall-04ae.uzwebfox.workers.dev/',
+  'https://orange-darkness-8843.najimsheikh071.workers.dev/',
+  'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
+]
+
+/** Build the list of CF Worker URLs from env (supports multiple + backward compat).
+ *  v144: CF Workers ONLY — no other proxies. If env is empty, uses FALLBACK_WORKERS. */
+function getCfWorkerUrls(): string[] {
+  const urls: string[] = []
+  // CF_WORKER_URLS (comma-separated, preferred)
+  const multi = process.env.CF_WORKER_URLS
+  if (multi) {
+    for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
+      urls.push(u.endsWith('/') ? u : u + '/')
+    }
+  }
+  // CF_WORKER_URL (single, backward compat) — add if not already in list
+  const single = process.env.CF_WORKER_URL
+  if (single) {
+    const normalized = single.endsWith('/') ? single : single + '/'
+    if (!urls.includes(normalized)) urls.push(normalized)
+  }
+  return urls.length > 0 ? urls : FALLBACK_WORKERS
+}
+
 /**
  * billing.sud.uz blocks many IPs (including Tor exit nodes). We route billing
  * requests through free CORS proxies that run on unblocked datacenter IPs.
@@ -168,8 +201,7 @@ class ProxyPool {
 //    CF Worker is EXCLUDED from billing (it always gets 521)
 function buildCaptchaPool(): { url: string; needsEncoding?: boolean }[] {
   const list: { url: string; needsEncoding?: boolean }[] = []
-  // CF Workers work perfectly for recaptcha.sud.uz (captcha endpoints).
-  // Read CF_WORKER_URLS (multi, preferred) + CF_WORKER_URL (single, backward compat).
+  // v144: CF Workers ONLY — no other proxies (cors.sh, allorigins removed).
   const urls = getCfWorkerUrls()
   for (const u of urls) {
     list.push({ url: u })
@@ -177,15 +209,12 @@ function buildCaptchaPool(): { url: string; needsEncoding?: boolean }[] {
   if (list.length > 0) {
     console.log(`[billing] ${list.length} CF Worker(s) enabled for captcha API`)
   }
-  list.push({ url: 'https://proxy.cors.sh/' })
-  list.push({ url: 'https://api.allorigins.win/raw?url=', needsEncoding: true })
   return list
 }
 
 function buildBillingPool(): { url: string; needsEncoding?: boolean }[] {
-  // CF Workers work for billing.sud.uz search + checkStatus (intermittent 521
-  // but rotating across 4 workers spreads the load). Read CF_WORKER_URLS (multi,
-  // preferred) + CF_WORKER_URL (single, backward compat).
+  // v144: CF Workers ONLY — no other proxies (cors.sh, allorigins, corsproxy.io,
+  // codetabs, thingproxy all removed per user request).
   const list: { url: string; needsEncoding?: boolean }[] = []
   const urls = getCfWorkerUrls()
   for (const u of urls) {
@@ -194,12 +223,6 @@ function buildBillingPool(): { url: string; needsEncoding?: boolean }[] {
   if (list.length > 0) {
     console.log(`[billing] ${list.length} CF Worker(s) enabled for billing API`)
   }
-  list.push({ url: 'https://proxy.cors.sh/' })
-  // Fallback proxies (rarely work but health tracker handles them)
-  list.push({ url: 'https://api.allorigins.win/raw?url=', needsEncoding: true })
-  list.push({ url: 'https://corsproxy.io/?url=' })
-  list.push({ url: 'https://api.codetabs.com/v1/proxy/?quest=' })
-  list.push({ url: 'https://thingproxy.freeboard.io/fetch/' })
   return list
 }
 
@@ -906,32 +929,9 @@ export async function searchBillsByInn(
 // direct → worker1... so no single IP gets hammered.
 let requestCounter = 0
 
-/** Build the list of CF Worker URLs from env (supports multiple + backward compat). */
-// Hardcoded fallback workers — used if .env CF_WORKER_URLS is missing.
-// This prevents "via direct" (IP blocking) when .env gets lost.
-const FALLBACK_WORKERS = [
-  'https://broad-field-f2b0.uzwebfox.workers.dev/',
-  'https://wild-hall-04ae.uzwebfox.workers.dev/',
-  'https://orange-darkness-8843.najimsheikh071.workers.dev/',
-  'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
-]
-function getCfWorkerUrls(): string[] {
-  const urls: string[] = []
-  // CF_WORKER_URLS (comma-separated, preferred)
-  const multi = process.env.CF_WORKER_URLS
-  if (multi) {
-    for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
-      urls.push(u.endsWith('/') ? u : u + '/')
-    }
-  }
-  // CF_WORKER_URL (single, backward compat) — add if not already in list
-  const single = process.env.CF_WORKER_URL
-  if (single) {
-    const normalized = single.endsWith('/') ? single : single + '/'
-    if (!urls.includes(normalized)) urls.push(normalized)
-  }
-  return urls.length > 0 ? urls : FALLBACK_WORKERS
-}
+// v144: FALLBACK_WORKERS + getCfWorkerUrls moved to top of file (before
+// buildCaptchaPool) to fix "Cannot access before initialization" ReferenceError.
+// The duplicate definitions that were here have been removed.
 
 /** Get the next proxy to try (round-robin among CF Workers only — NEVER direct).
  *  Using direct exposes the server IP and gets it blocked by billing.sud.uz. */

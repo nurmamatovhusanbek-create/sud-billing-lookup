@@ -333,104 +333,17 @@
 }
 
 /* ============================================================
-   BASE RESET — square corners EVERYWHERE, with token-based exemptions
-   v145: Replaced hardcoded values with --r-* tokens. Added all missing
-   classes from the §1a/§7c gap audit so nothing renders square next to
-   rounded siblings. See UI redesign guide §2.
+   BASE RESET — v147 §2 structural fix.
+   REMOVED: * { border-radius: 0 !important; } universal reset + 5 opt-in
+   exemption lists + input/select/textarea blanket reset.
+   These were the root cause of "squares" recurring: every new component
+   was square by default and only became rounded if someone manually added
+   its class to one of 4 far-away lists. Now each component declares its
+   OWN border-radius in its OWN CSS block — the normal CSS way.
    ============================================================ */
 @layer base {
   * {
     box-sizing: border-box;
-    border-radius: 0 !important;
-  }
-  /* Dots — circular marks only */
-  .blob,
-  .status-dot,
-  .tor-badge .dot,
-  .chip .dot,
-  .copy-btn .dot {
-    border-radius: var(--r-dot) !important;
-  }
-  /* Pills — nav, buttons, search fields, status badges that read as pills */
-  .btn-primary,
-  .btn.btn-primary,
-  .btn-ghost,
-  .btn-ghost.btn-sm,
-  .toggle-btn,
-  .chip.sample-chip,
-  .page-btn,
-  .folder-tab,
-  .tab-btn,
-  .liquid-rail,
-  .tabs-bar,
-  .toggle-pair,
-  .tor-badge,
-  .theme-toggle,
-  .ext-link,
-  .korish-btn,
-  .icon-btn,
-  .btn-icon {
-    border-radius: var(--r-pill) !important;
-  }
-  /* Cards — every top-level card/panel. v145: added missing classes from
-     §1a gap audit: action-card, detail-toolbar, skel-card, trend-case-card.
-     skel-card MUST match its real counterpart (bill-card) since it's a
-     loading placeholder. */
-  .panel,
-  .glass,
-  .bento,
-  .bill-card,
-  .case-card,
-  .hearing-card,
-  .watch-card,
-  .rating-card,
-  .detail-panel,
-  .loading-box,
-  .decision-bar,
-  .quick-tile,
-  .company-tile,
-  .summary-cell,
-  .sum-card,
-  .role-card,
-  .ct-card,
-  .empty-state,
-  .trend-month-cases,
-  .console-input,
-  .input,
-  .input-wrap,
-  .company-banner,
-  .download-toolbar,
-  .stats-filter-bar,
-  .folder-nav,
-  .folder-panel,
-  .inn-bar,
-  .filter-bar,
-  .action-card,
-  .detail-toolbar,
-  .skel-card,
-  .trend-case-card {
-    border-radius: var(--r-card) !important;
-  }
-  /* Fields — internal field cells, nested tiles, inputs.
-     v145: Added money-cell, info-row, founder-row from §1a/§7c gap audit.
-     These sit inside cards and were rendering square next to rounded siblings. */
-  .money-cell,
-  .info-row,
-  .founder-row {
-    border-radius: var(--r-field) !important;
-  }
-  /* Tags — badges, chips, filter-chips, icon tiles.
-     v145: Added rating-badge, card-head-icon, brand-mark from §1a/§7c gap audit.
-     brand-mark was separately forced to 0 — now joins the tag system. */
-  .badge,
-  .chip:not(.sample-chip),
-  .filter-chip,
-  .ft-count,
-  .copy-btn,
-  .rating-badge,
-  .card-head-icon,
-  .brand-mark {
-    border-radius: var(--r-tag) !important;
   }
   *, *::before, *::after { box-sizing: border-box; }
   html {
@@ -459,7 +372,8 @@
     outline-offset: 2px;
   }
   [data-lucide] { stroke-width: 2; flex-shrink: 0; }
-  input, select, textarea { border-radius: 0 !important; }
+  /* v147 §2: Removed input, select, textarea { border-radius: 0 !important; }
+     — each form control now declares its own radius in its own CSS block. */
 }
 
 /* ============================================================
@@ -583,6 +497,7 @@
   color: var(--text-2);
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  border-radius: var(--r-pill);
 }
 .tor-badge:hover { background: var(--surface); color: var(--text-1); border-color: var(--accent); }
 .status-dot, .tor-badge .dot {
@@ -611,6 +526,7 @@
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  border-radius: var(--r-pill);
 }
 .ext-link:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 .ext-link svg { width: 11px; height: 11px; }
@@ -625,6 +541,7 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.2s ease;
+  border-radius: var(--r-pill);
 }
 .btn-icon:hover { border-color: var(--accent); color: var(--accent); transform: rotate(90deg); }
 .icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
@@ -643,6 +560,7 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  border-radius: var(--r-pill);
 }
 .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .theme-toggle svg { width: 14px; height: 14px; }
@@ -693,6 +611,7 @@
   font-weight: 700;
   white-space: nowrap;
   transition: color 0.35s cubic-bezier(0.16, 1, 0.3, 1), background 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--r-pill);
 }
 .tab-btn svg { width: 15px; height: 15px; opacity: 0.7; flex-shrink: 0; transition: opacity 0.35s ease; }
 /* v141 Step 3: Hover state for inactive tabs — subtle surface fill */
@@ -741,6 +660,7 @@
   position: relative;
   overflow: hidden;
   margin-bottom: 18px;
+  border-radius: var(--r-card);
 }
 @media (min-width: 640px) { .glass { padding: 44px 40px; } }
 .glass::before {
@@ -766,6 +686,7 @@
   margin-bottom: 14px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--r-card);
 }
 @media (min-width: 640px) { .panel { padding: 24px; } }
 .panel-hover:hover {
@@ -804,6 +725,7 @@
   -webkit-backdrop-filter: blur(16px);
   transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
   position: relative;
+  border-radius: var(--r-card);
 }
 .bento-hover:hover {
   transform: translateY(-3px);
@@ -819,6 +741,7 @@
   padding: 34px 24px;
   position: relative;
   overflow: hidden;
+  border-radius: var(--r-card);
 }
 @media (min-width: 640px) { .bento-strong { padding: 44px 40px; } }
 .bento-strong::before {
@@ -917,6 +840,7 @@
   color: var(--accent);
   border: 1px solid var(--border);
   flex-shrink: 0;
+  border-radius: var(--r-tag);
 }
 .card-head-icon svg { width: 14px; height: 14px; }
 .card-head-title {
@@ -952,6 +876,7 @@
   border: 1px solid var(--border);
   background: var(--surface-2);
   font-family: var(--font-jetbrains), ui-monospace, monospace;
+  border-radius: var(--r-tag);
 }
 .eyebrow svg, .h-eyebrow svg { width: 12px; height: 12px; }
 
@@ -1040,6 +965,7 @@
 .input-wrap {
   position: relative;
   flex: 1;
+  border-radius: var(--r-field);
 }
 .input-wrap > svg, .input-wrap svg {
   position: absolute;
@@ -1063,6 +989,7 @@
   font-size: 14.5px;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  border-radius: var(--r-field);
 }
 /* v145 §7d: Removed manual dark-mode patch — --panel-bg auto-swaps in dark theme */
 .console-input::placeholder, .input::placeholder { color: var(--text-3); }
@@ -1202,6 +1129,7 @@
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  border-radius: var(--r-tag);
 }
 .chip:hover {
   border-color: var(--accent);
@@ -1257,6 +1185,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 14px;
+  border-radius: var(--r-card);
 }
 .inn-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .inn-icon {
@@ -1268,6 +1197,7 @@
   justify-content: center;
   color: var(--accent);
   flex: none;
+  border-radius: var(--r-tag);
 }
 .inn-icon svg { width: 20px; height: 20px; }
 .inn-label {
@@ -1320,6 +1250,7 @@
   padding: 16px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  border-radius: var(--r-card);
 }
 /* v145 §7d: Removed manual dark-mode patch — --panel-bg auto-swaps */
 .summary-cell .lbl {
@@ -1351,6 +1282,7 @@
   align-items: center;
   gap: 10px;
   justify-content: space-between;
+  border-radius: var(--r-card);
 }
 .filter-left {
   display: flex;
@@ -1377,6 +1309,7 @@
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   outline: none;
   transition: border-color 0.15s ease;
+  border-radius: var(--r-field);
 }
 [data-theme='dark'] .select-wrap select {
   background: var(--surface-2) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' stroke='%23f5f5f5' stroke-width='1.4' fill='none'/></svg>") no-repeat right 13px center;
@@ -1394,7 +1327,8 @@
 /* ============================================================
    BILL CARD + CASE CARD — square panel variants
    ============================================================ */
-.bill-card, .case-card { padding: 22px; }
+.bill-card, .case-card { padding: 22px;   border-radius: var(--r-card);
+}
 @media (min-width: 640px) { .bill-card, .case-card { padding: 26px; } }
 
 .bill-head {
@@ -1433,6 +1367,7 @@
   display: flex;
   align-items: center;
   transition: color 0.15s ease;
+  border-radius: var(--r-tag);
 }
 .copy-btn:hover { color: var(--accent); }
 .copy-btn svg { width: 13px; height: 13px; }
@@ -1466,6 +1401,7 @@
   background: var(--surface-2);
   color: var(--text-2);
   white-space: nowrap;
+  border-radius: var(--r-tag);
 }
 .badge svg { width: 11px; height: 11px; flex-shrink: 0; }
 
@@ -1598,6 +1534,7 @@
      The proper structural fix is DataStrip (Step 2), but this stopgap
      closes the bug now. */
   min-width: 0;
+  border-radius: var(--r-field);
 }
 .money-cell:hover { border-color: var(--border); }
 .money-cell .label, .money-cell .lbl {
@@ -1690,6 +1627,7 @@
   gap: 3px;
   min-width: 0;
   transition: border-color 0.15s ease, background 0.15s ease;
+  border-radius: var(--r-field);
 }
 .info-row:hover { border-color: var(--border); }
 .info-row .lbl, .info-row .label {
@@ -1751,6 +1689,7 @@
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  border-radius: var(--r-field);
 }
 .expand-btn:hover { border-color: var(--accent); color: var(--accent); }
 .expand-btn svg { width: 14px; height: 14px; transition: transform 0.3s ease; }
@@ -1759,6 +1698,7 @@
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--r-field);
 }
 .expand-content.is-open { max-height: 2000px; }
 .expand-inner { padding-top: 16px; }
@@ -1807,7 +1747,8 @@
 @media (max-width: 560px) { .detail-grid dt { border-right: 0; } }
 
 /* detail-panel (case expand wrapper) */
-.detail-panel { display: flex; flex-direction: column; gap: 16px; }
+.detail-panel { display: flex; flex-direction: column; gap: 16px;   border-radius: var(--r-card);
+}
 .detail-section { display: flex; flex-direction: column; gap: 12px; }
 .detail-toolbar {
   display: flex;
@@ -1815,6 +1756,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: -4px;
+  border-radius: var(--r-card);
 }
 .detail-section-title {
   font-size: 10px;
@@ -1861,6 +1803,7 @@
   background: var(--accent);
   border: 2px solid var(--void);
   box-sizing: content-box;
+  border-radius: var(--r-dot);
 }
 .hearing-item .when {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
@@ -1887,6 +1830,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   margin-top: 16px;
+  border-radius: var(--r-card);
 }
 .decision-icon {
   width: 30px;
@@ -1897,6 +1841,7 @@
   align-items: center;
   justify-content: center;
   flex: none;
+  border-radius: var(--r-tag);
 }
 .decision-icon svg { width: 16px; height: 16px; }
 .decision-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
@@ -1927,6 +1872,7 @@
   position: relative;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  border-radius: var(--r-card);
 }
 /* v145 §7d: Removed manual dark-mode patch — --panel-bg auto-swaps */
 .company-tile:hover {
@@ -1974,6 +1920,7 @@
   color: var(--text-3);
   cursor: pointer;
   border: 1px solid var(--border-soft);
+  border-radius: var(--r-pill);
 }
 .trash:hover { color: var(--accent); border-color: var(--accent); }
 .trash svg { width: 12px; height: 12px; }
@@ -1988,6 +1935,7 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  border-radius: var(--r-card);
 }
 /* v145 §7f: Conic-gradient rating ring (reuses donut technique from Stats tab) */
 .rating-ring {
@@ -2056,6 +2004,7 @@
   font-size: 13px;
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   letter-spacing: 0.06em;
+  border-radius: var(--r-tag);
 }
 .rating-badge svg, .rating-cat svg { width: 14px; height: 14px; }
 .rating-label {
@@ -2072,10 +2021,12 @@
   width: 100%;
   max-width: 200px;
   border: 1px solid var(--border-soft);
+  border-radius: var(--r-field);
 }
 .rating-bar-fill {
   height: 100%;
   background: var(--accent);
+  border-radius: var(--r-field);
 }
 .rating-info { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 .rating-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -2117,6 +2068,7 @@
   text-align: left;
   font-family: inherit;
   width: 100%;
+  border-radius: var(--r-card);
 }
 [data-theme='dark'] .quick-tile, [data-theme='dark'] .action-card { background: rgba(255,255,255,0.04); }
 .quick-tile:hover, .action-card:hover {
@@ -2140,6 +2092,7 @@
   background: var(--accent-dim);
   color: var(--accent);
   border: 1px solid var(--border);
+  border-radius: var(--r-tag);
 }
 .action-card-icon svg { width: 14px; height: 14px; }
 .action-card-desc {
@@ -2173,6 +2126,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--r-pill);
 }
 .page-btn:hover:not(:disabled) {
   border-color: var(--accent);
@@ -2189,7 +2143,8 @@
 /* ============================================================
    LOADING STATE — spinner + phase steps + progress + skeletons
    ============================================================ */
-.loading-box { /* container */ }
+.loading-box { /* container */   border-radius: var(--r-card);
+}
 .loading-head {
   display: flex;
   align-items: center;
@@ -2220,6 +2175,7 @@
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  border-radius: var(--r-pill);
 }
 .phase-step.is-current {
   background: var(--accent-dim);
@@ -2255,12 +2211,14 @@
   overflow: hidden;
   margin-top: 4px;
   border: 1px solid var(--border-soft);
+  border-radius: var(--r-field);
 }
 .progress-fill {
   height: 100%;
   width: 0%;
   background: var(--accent);
   transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--r-field);
 }
 
 .skeleton-grid {
@@ -2271,6 +2229,7 @@
 .skel, .skel-card {
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
+  border-radius: var(--r-card);
 }
 .skel-card.shimmer, .shimmer {
   background: linear-gradient(90deg, var(--surface) 25%, var(--skeleton-2) 37%, var(--surface) 63%);
@@ -2301,6 +2260,7 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   transition: background 0.15s ease, color 0.15s ease;
+  border-radius: var(--r-pill);
 }
 .korish-btn:hover { background: var(--accent); color: var(--void); }
 .korish-btn svg { width: 11px; height: 11px; }
@@ -2317,6 +2277,7 @@
   padding: 10px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
+  border-radius: var(--r-field);
 }
 .founder-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .founder-icon {
@@ -2329,6 +2290,7 @@
   color: var(--text-2);
   border: 1px solid var(--border);
   flex-shrink: 0;
+  border-radius: var(--r-tag);
 }
 .founder-icon svg { width: 13px; height: 13px; }
 .founder-name {
@@ -2351,6 +2313,7 @@
   color: var(--void);
   border: 1px solid var(--accent);
   flex-shrink: 0;
+  border-radius: var(--r-tag);
 }
 
 /* ============================================================
@@ -2362,6 +2325,7 @@
   font-size: 12.5px;
   border: 1px solid var(--border-soft);
   overflow: hidden;
+  border-radius: var(--r-field);
 }
 .usage-table thead th {
   text-align: left;
@@ -2409,6 +2373,7 @@
   margin-bottom: 26px;
   font-weight: 600;
   font-family: var(--font-jetbrains), ui-monospace, monospace;
+  border-radius: var(--r-card);
 }
 .hint-banner svg { width: 14px; height: 14px; flex: none; }
 
@@ -2480,6 +2445,7 @@
   border: 1px solid var(--border);
   padding: 8px 18px;
   box-shadow: var(--shadow-2);
+  border-radius: var(--r-card);
 }
 
 /* ============================================================
@@ -2654,6 +2620,7 @@
   letter-spacing: 0.04em;
   background: transparent;
   color: currentColor;
+  border-radius: var(--r-tag);
 }
 .folder-tab.is-active .ft-count {
   background: var(--void);
@@ -2683,7 +2650,8 @@
   position: relative;
   margin-top: 12px;
 }
-.folder-panel { display: none; }
+.folder-panel { display: none;   border-radius: var(--r-card);
+}
 .folder-panel.is-active {
   display: block;
   animation: fadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
@@ -2806,6 +2774,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
+  border-radius: var(--r-card);
 }
 .filter-group {
   display: flex;
@@ -2836,6 +2805,7 @@
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   transition: border-color 0.2s, color 0.2s, background 0.2s;
+  border-radius: var(--r-pill);
 }
 .sample-chip:hover {
   border-style: solid;
@@ -2860,6 +2830,7 @@
   position: relative;
   overflow: hidden;
   margin-bottom: 0;
+  border-radius: var(--r-card);
 }
 .sum-card:hover {
   transform: translateY(-3px);
@@ -2931,7 +2902,8 @@
 }
 @media (min-width: 640px) { .role-grid { grid-template-columns: 1fr 1fr; } }
 
-.role-card { margin-bottom: 0; }
+.role-card { margin-bottom: 0;   border-radius: var(--r-card);
+}
 .role-card .rc-head {
   display: flex;
   align-items: baseline;
@@ -2967,6 +2939,7 @@
   border: 1px solid var(--border-soft);
   overflow: hidden;
   margin-bottom: 14px;
+  border-radius: var(--r-field);
 }
 .role-card .rc-bar > div {
   height: 100%;
@@ -2998,6 +2971,7 @@
   width: 10px; height: 10px;
   background: var(--accent);
   flex-shrink: 0;
+  border-radius: var(--r-dot);
 }
 .role-card .rc-swatch.outline { background: transparent; border: 1px solid var(--text-1); }
 .role-card .rc-swatch.surface { background: var(--surface-3); }
@@ -3027,6 +3001,7 @@
   position: relative;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
+  border-radius: var(--r-field);
 }
 .timeline-scroll::-webkit-scrollbar { height: 6px; }
 .timeline-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -3077,6 +3052,7 @@
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
+  border-radius: var(--r-tag);
 }
 .timeline-bar:hover .tl-tip { opacity: 1; }
 .timeline-labels {
@@ -3118,6 +3094,7 @@
   -webkit-backdrop-filter: blur(16px);
   position: relative;
   margin-bottom: 0;
+  border-radius: var(--r-card);
 }
 .ct-card:hover {
   transform: translateY(-3px);
@@ -3207,6 +3184,7 @@
   background: var(--surface-3);
   position: relative;
   overflow: hidden;
+  border-radius: var(--r-field);
 }
 .cat-row .cat-bar > span {
   display: block;
@@ -3302,6 +3280,7 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  border-radius: var(--r-tag);
 }
 .copy-btn-stats:hover {
   background: var(--accent);
@@ -3368,6 +3347,7 @@
   background: var(--accent);
   color: var(--void);
   flex-shrink: 0;
+  border-radius: var(--r-tag);
 }
 .case-result.lose .cr-icon { background: transparent; color: var(--text-1); border: 1px solid var(--text-1); }
 .case-result.neutral .cr-icon { background: var(--surface-3); color: var(--text-1); }
@@ -3421,6 +3401,7 @@
   gap: 16px;
   padding: 60px 24px;
   text-align: center;
+  border-radius: var(--r-card);
 }
 .empty-state .es-icon {
   width: 64px; height: 64px;
@@ -3430,6 +3411,7 @@
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-3);
+  border-radius: var(--r-tag);
 }
 .empty-state .es-icon svg { width: 28px; height: 28px; }
 .empty-state .es-title {
@@ -3547,6 +3529,7 @@
   gap: 14px;
   flex-wrap: wrap;
   padding: 14px 16px;
+  border-radius: var(--r-card);
 }
 .download-toolbar .dl-left {
   display: flex;
@@ -3611,6 +3594,7 @@
   width: 180px;
   height: 180px;
   flex-shrink: 0;
+  border-radius: var(--r-dot);
 }
 .donut-ring::after {
   content: '';
@@ -3664,6 +3648,7 @@
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+  border-radius: var(--r-dot);
 }
 .dl-swatch.dl-win { background: var(--accent); }
 .dl-swatch.dl-lose { background: var(--accent); opacity: 0.4; }
@@ -3721,11 +3706,13 @@
   border: 1px solid var(--border-soft);
   overflow: hidden;
   position: relative;
+  border-radius: var(--r-field);
 }
 .winrate-bar-fill {
   height: 100%;
   background: var(--accent);
   transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--r-field);
 }
 .wr-value {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
@@ -3802,7 +3789,8 @@
    The old flex-based timeline had a persistent overflow bug. This SVG version
    uses fixed 24px bars + 4px gap with horizontal scroll, so the layout never
    collapses regardless of how many months are returned. */
-.trend-chart-container { overflow-x: auto; padding-bottom: 8px; }
+.trend-chart-container { overflow-x: auto; padding-bottom: 8px;   border-radius: var(--r-field);
+}
 .trend-chart-container::-webkit-scrollbar { height: 6px; }
 .trend-chart-container::-webkit-scrollbar-thumb { background: var(--border-strong); }
 .trend-svg { display: block; }
@@ -3823,6 +3811,7 @@
   position: relative;
   padding: 18px 18px 16px;
   cursor: pointer;
+  border-radius: var(--r-card);
 }
 .watch-card:hover {
   transform: translateY(-3px);
@@ -3865,6 +3854,7 @@
   justify-content: center;
   color: var(--text-3);
   transition: all 0.2s;
+  border-radius: var(--r-pill);
 }
 .watch-card .wc-trash:hover { color: var(--accent); border-color: var(--accent); }
 .watch-card .wc-trash svg { width: 12px; height: 12px; }
@@ -4038,6 +4028,7 @@
   letter-spacing: 0.08em;
   color: var(--text-2);
   cursor: pointer;
+  border-radius: var(--r-pill);
 }
 .compare-toggle input { accent-color: var(--accent); }
 .compare-input-wrap {
@@ -4104,6 +4095,7 @@
   padding: 6px 2px;
   background: var(--surface);
   border: 1px solid var(--border-soft);
+  border-radius: var(--r-field);
 }
 .watch-stat .val {
   font-family: var(--font-mono);
@@ -4146,6 +4138,7 @@
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.2s, color 0.2s;
+  border-radius: var(--r-pill);
 }
 .watch-card:hover .watch-trash { opacity: 1; }
 .watch-trash:hover { color: var(--accent); border-color: var(--accent); }
@@ -4280,6 +4273,7 @@
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-left: 2px solid var(--accent);
+  border-radius: var(--r-card);
 }
 .trend-month-head {
   display: flex;
@@ -4307,6 +4301,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--r-pill);
 }
 .trend-month-close:hover { color: var(--accent); border-color: var(--accent); }
 .trend-month-list {
@@ -4315,6 +4310,7 @@
   gap: 4px;
   max-height: 200px;
   overflow-y: auto;
+  border-radius: var(--r-field);
 }
 .trend-case-row {
   display: flex;
@@ -4389,6 +4385,7 @@
   padding: 10px 12px;
   cursor: pointer;
   position: relative;
+  border-radius: var(--r-card);
 }
 .trend-case-card:hover {
   border-color: var(--accent);
@@ -4450,6 +4447,7 @@
   border-top: none;
   border-bottom: none;
   padding: 20px 18px 16px;
+  border-radius: var(--r-card);
 }
 /* Serrated edges — repeating triangle mask */
 .receipt-edge {
@@ -4535,6 +4533,7 @@
   width: 3px;
   background: var(--text-1);
   min-height: 8px;
+  border-radius: var(--r-tag);
 }
 .receipt-barcode-number {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
@@ -4830,4 +4829,102 @@
 .ct-card {
   aspect-ratio: auto;
   min-height: 120px;
+}
+
+/* ============================================================
+   v147 §3: CaseRefRow — shared "related case" row primitive.
+   Entire row is clickable. Status = dot+text (not a bordered chip).
+   View = trailing chevron (hover-only fill).
+   ============================================================ */
+.case-ref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-bottom: 1px dashed var(--border-soft);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-radius: var(--r-field);
+}
+.case-ref-row:last-child { border-bottom: none; }
+.case-ref-row:hover {
+  background: var(--surface-2);
+}
+.case-ref-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  min-width: 0;
+  flex: 1;
+}
+.case-ref-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.case-ref-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-dot);
+  flex-shrink: 0;
+}
+.case-ref-status-text {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  font-weight: 600;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+.case-ref-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.case-ref-primary-tag {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  font-weight: 700;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-tag);
+  flex-shrink: 0;
+}
+.case-ref-side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex-shrink: 0;
+}
+.case-ref-amount {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.case-ref-amount-unit {
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+.case-ref-chevron {
+  width: var(--icon-sm, 14px);
+  height: var(--icon-sm, 14px);
+  color: var(--text-3);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.case-ref-row:hover .case-ref-chevron {
+  color: var(--accent);
+  transform: translateX(2px);
+}
+[data-theme='dark'] .case-ref-row:hover {
+  background: rgba(255,255,255,0.04);
 }

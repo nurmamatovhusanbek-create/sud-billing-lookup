@@ -1,14 +1,15 @@
 /**
  * ReceiptView — stylized cheque/receipt rendering for bill usage history.
  *
- * v145 §5: Replaces the plain .usage-table in BillCard's expand section with
- * a vertical ticket that looks like an actual receipt. Monospace-first
- * (JetBrains Mono), serrated top/bottom edges, barcode-style case numbers,
- * dashed dividers between line items.
+ * v147 §1.1: Fixed duplicate case bug — claim case number and history items
+ * are now merged into ONE list. If the claim case already appears in history,
+ * it's marked as "Asosiy" (primary) instead of being duplicated.
  *
- * This is the "signature element" — the one place to spend visual boldness.
+ * v147 §3: Uses CaseRefRow for each case reference — one shared row pattern
+ * with dot+text status (not a bordered chip) and trailing chevron.
  */
-import { Copy, Eye, Receipt } from 'lucide-react'
+import { Receipt } from 'lucide-react'
+import { CaseRefRow } from './case-ref-row'
 
 interface ReceiptUsageItem {
   caseNumber: string | null
@@ -44,6 +45,25 @@ export function ReceiptView({
   formatSum,
   formatDate,
 }: ReceiptViewProps) {
+  // v147 §1.1: Merge claimCaseNumber into history to avoid duplicates.
+  // If claimCaseNumber already exists in history, mark that row as primary.
+  // If it doesn't exist, prepend it as a new primary row.
+  const claimInHistory = claimCaseNumber
+    ? history.some(h => h.caseNumber === claimCaseNumber)
+    : false
+
+  const mergedHistory = [...history]
+  if (claimCaseNumber && !claimInHistory) {
+    mergedHistory.unshift({
+      caseNumber: claimCaseNumber,
+      caseId: null,
+      amount: null,
+      rolledBackAt: null,
+      courtType: undefined,
+      invoiceStatus: null,
+    })
+  }
+
   return (
     <div className="receipt-view">
       {/* Serrated top edge */}
@@ -100,59 +120,31 @@ export function ReceiptView({
           </div>
         </div>
 
-        {/* Claim case number (if any) */}
-        {claimCaseNumber && (
-          <div className="receipt-claim">
-            <span className="receipt-meta-label">№ Da'vo ish raqami</span>
-            <div className="receipt-claim-row">
-              <span className="receipt-claim-number mono">{claimCaseNumber}</span>
-              <button
-                type="button"
-                className="korish-btn"
-                onClick={() => onViewCase(claimCaseNumber, undefined)}
-              >
-                <Eye className="w-3.5 h-3.5" /> Ko'rish
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Usage history — line items like a real receipt */}
-        {history.length > 0 && (
+        {/* v147 §1.1 + §3: Merged case list using CaseRefRow.
+            No more separate claim block + history list.
+            One row per case, at most one view action per case. */}
+        {mergedHistory.length > 0 && (
           <div className="receipt-items">
             <div className="receipt-items-header">
-              Ishlatilgan ishlar ({history.length})
+              Ishlatilgan ishlar ({mergedHistory.length})
             </div>
             <div className="receipt-divider" />
-            {history.map((h, i) => (
-              <div key={i} className="receipt-item">
-                <div className="receipt-item-top">
-                  <span className="receipt-item-num mono">
-                    {h.caseNumber || (h.caseId ? `#${h.caseId}` : '—')}
-                  </span>
-                  <span className={`badge ${h.rolledBackAt ? 'b-unpaid' : 'b-paid'}`}>
-                    {h.rolledBackAt ? 'Qaytarilgan' : 'Ishlatilgan'}
-                  </span>
-                </div>
-                <div className="receipt-item-bottom">
-                  <span className="receipt-item-amount mono">
-                    {formatSum(h.amount)}
-                    <span className="receipt-item-unit"> so'm</span>
-                  </span>
-                  {h.caseNumber && (
-                    <div className="receipt-item-actions">
-                      <button
-                        type="button"
-                        className="korish-btn"
-                        onClick={() => onViewCase(h.caseNumber!, h.courtType)}
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Ko'rish
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+            {mergedHistory.map((h, i) => {
+              const isPrimary = claimCaseNumber === h.caseNumber
+              const status = h.rolledBackAt ? 'returned' : 'used'
+              const statusLabel = h.rolledBackAt ? 'Qaytarilgan' : 'Ishlatilgan'
+              return (
+                <CaseRefRow
+                  key={i}
+                  caseNumber={h.caseNumber || (h.caseId ? `#${h.caseId}` : '—')}
+                  status={status}
+                  statusLabel={statusLabel}
+                  amount={h.amount != null ? formatSum(h.amount) : null}
+                  isPrimary={isPrimary}
+                  onClick={h.caseNumber ? () => onViewCase(h.caseNumber!, h.courtType) : undefined}
+                />
+              )
+            })}
           </div>
         )}
 

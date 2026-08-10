@@ -7,7 +7,7 @@
    THEME INLINE TOKENS — Tailwind color bindings (monochrome)
    ============================================================ */
 @theme inline {
-  --font-display: var(--font-unbounded), sans-serif;
+  --font-display: var(--font-jakarta), sans-serif;
   --font-body: var(--font-jakarta), system-ui, sans-serif;
   --font-sans: var(--font-jakarta), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
@@ -317,6 +317,68 @@
   .copy-btn .dot {
     border-radius: 50% !important;
   }
+  /* v141 Step 1: Exempt buttons from the square-corners rule so pill-shaped
+     CTAs (border-radius: 9999px) can render. Tabela-inspired design. */
+  .btn-primary,
+  .btn.btn-primary,
+  .btn-ghost,
+  .btn-ghost.btn-sm,
+  .toggle-btn,
+  .chip.sample-chip,
+  .page-btn,
+  .folder-tab,
+  .tab-btn,
+  .liquid-rail,
+  .tabs-bar,
+  .toggle-pair,
+  .tor-badge,
+  .theme-toggle,
+  .ext-link {
+    border-radius: 9999px !important;
+  }
+  /* v141 Step 6: Rounded card corners (Tabela-inspired).
+     Panels, cards, and glass containers get a moderate border-radius (12px)
+     for a softer, more premium feel. NOT fully rounded — keeps data-density
+     usable. Badges and tags keep a smaller radius (6px). */
+  .panel,
+  .glass,
+  .bento,
+  .bill-card,
+  .case-card,
+  .hearing-card,
+  .watch-card,
+  .rating-card,
+  .detail-panel,
+  .loading-box,
+  .decision-bar,
+  .quick-tile,
+  .company-tile,
+  .summary-cell,
+  .sum-card,
+  .role-card,
+  .ct-card,
+  .empty-state,
+  .trend-month-cases,
+  .console-input,
+  .input,
+  .input-wrap,
+  .company-banner,
+  .download-toolbar,
+  .stats-filter-bar,
+  .folder-nav,
+  .folder-panel,
+  .inn-bar,
+  .filter-bar {
+    border-radius: 12px !important;
+  }
+  /* Smaller radius for badges, chips, and tags */
+  .badge,
+  .chip:not(.sample-chip),
+  .filter-chip,
+  .ft-count,
+  .copy-btn {
+    border-radius: 6px !important;
+  }
   *, *::before, *::after { box-sizing: border-box; }
   html {
     -webkit-text-size-adjust: 100%;
@@ -431,7 +493,7 @@
 .brand-mark svg { width: 18px; height: 18px; position: relative; z-index: 1; color: var(--void); }
 .brand-text { min-width: 0; line-height: 1.2; }
 .brand-title {
-  font-family: var(--font-unbounded), sans-serif;
+  font-family: var(--font-jakarta), sans-serif;
   font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
   color: var(--text-1);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -548,7 +610,7 @@
 .liquid-rail, .tabs-bar {
   position: relative;
   display: inline-flex;
-  gap: 2px;
+  gap: 4px;
   padding: 6px;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
@@ -556,6 +618,8 @@
   -webkit-backdrop-filter: blur(10px);
   overflow-x: auto;
   scrollbar-width: none;
+  /* v141 Step 3: Pill-shaped tab container */
+  border-radius: 9999px;
 }
 .liquid-rail::-webkit-scrollbar, .tabs-bar::-webkit-scrollbar { display: none; }
 
@@ -574,14 +638,20 @@
   font-size: 12.5px;
   font-weight: 700;
   white-space: nowrap;
-  transition: color 0.35s cubic-bezier(0.16, 1, 0.3, 1), background 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.35s cubic-bezier(0.16, 1, 0.3, 1), background 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.tab-btn svg { width: 15px; height: 15px; opacity: 0.7; flex-shrink: 0; }
-.tab-btn:hover { color: var(--text-1); }
+.tab-btn svg { width: 15px; height: 15px; opacity: 0.7; flex-shrink: 0; transition: opacity 0.35s ease; }
+/* v141 Step 3: Hover state for inactive tabs — subtle surface fill */
+.tab-btn:hover {
+  color: var(--text-1);
+  background: var(--surface-3);
+}
+.tab-btn:hover svg { opacity: 0.9; }
 .tab-btn.is-active {
   color: var(--void);
   background: var(--accent);
-  box-shadow: 0 8px 20px -6px rgba(0,0,0,0.4);
+  /* v141 Step 3: Enhanced active tab shadow — more pronounced float */
+  box-shadow: 0 4px 12px -2px rgba(0,0,0,0.25), 0 8px 24px -6px rgba(0,0,0,0.15);
 }
 .tab-btn.is-active svg { opacity: 1; }
 @media (max-width: 640px) {
@@ -630,18 +700,44 @@
 .panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-2);
+  /* v141 Step 2: Soft, diffuse "floating" shadow (Tabela-inspired).
+     Was: var(--shadow-2) = 0 2px 8px -4px (too tight, barely visible).
+     Now: multi-layer soft shadow with more spread for a premium float feel. */
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.04),
+    0 4px 12px -2px rgba(0,0,0,0.06),
+    0 12px 32px -8px rgba(0,0,0,0.08);
   padding: 20px;
-  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.3s ease;
   margin-bottom: 14px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
 @media (min-width: 640px) { .panel { padding: 24px; } }
 .panel-hover:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: var(--accent);
-  box-shadow: var(--shadow-3);
+  /* v141 Step 2: Enhanced hover shadow — deeper, more spread */
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.06),
+    0 8px 20px -4px rgba(0,0,0,0.10),
+    0 20px 48px -12px rgba(0,0,0,0.14);
+}
+/* v141 Step 2: Dark-mode panel shadows — use white glows since black-on-black
+   is invisible. Creates the same "floating" effect on dark backgrounds. */
+[data-theme='dark'] .panel {
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.3),
+    0 4px 12px -2px rgba(0,0,0,0.4),
+    0 12px 32px -8px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+}
+[data-theme='dark'] .panel-hover:hover {
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.4),
+    0 8px 20px -4px rgba(0,0,0,0.5),
+    0 20px 48px -12px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 /* compat aliases for legacy page.tsx refs */
@@ -712,31 +808,44 @@
 .tab-section-sm:last-child { margin-bottom: 0; }
 
 /* Summary grid split modifier — visually separates count cards
-   (first 3) from money cards (last 3) in the Bills tab. [v123] */
+   (first 3) from money cards (last 3) in the Bills tab. [v123]
+   v141 Step 4: Bento-box asymmetric layout (Tabela-inspired).
+   First card of each trio is LARGE (spans 2 columns), creating
+   visual hierarchy instead of a flat 6-column row. */
 .summary-grid.is-split {
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 @media (min-width: 640px) {
-  .summary-grid.is-split { grid-template-columns: repeat(3, 1fr); }
+  /* 4-column bento: large + small + small per row */
+  .summary-grid.is-split { grid-template-columns: repeat(4, 1fr); }
+  /* Card 1 (Jami count) — LARGE, spans 2 columns */
+  .summary-grid.is-split .summary-cell:nth-child(1) {
+    grid-column: span 2;
+  }
+  /* Card 4 (Jami summa) — LARGE, spans 2 columns */
+  .summary-grid.is-split .summary-cell:nth-child(4) {
+    grid-column: span 2;
+  }
 }
 @media (min-width: 1000px) {
-  /* 6 cards in one row on wide screens, but with a small gap between
-     cells #3 and #4 so the count/money groups read separately. */
-  .summary-grid.is-split { grid-template-columns: repeat(6, 1fr); }
+  /* Keep the same 4-column bento on wide screens — no need for 6 columns.
+     The bento layout is more visually interesting and easier to scan. */
+  .summary-grid.is-split { grid-template-columns: repeat(4, 1fr); }
+  .summary-grid.is-split .summary-cell:nth-child(1) {
+    grid-column: span 2;
+  }
+  .summary-grid.is-split .summary-cell:nth-child(4) {
+    grid-column: span 2;
+  }
 }
+/* Remove the old vertical divider — bento layout doesn't need it */
 .summary-grid.is-split .summary-cell:nth-child(4) {
   position: relative;
 }
 @media (min-width: 1000px) {
   .summary-grid.is-split .summary-cell:nth-child(4)::before {
-    content: '';
-    position: absolute;
-    left: -5px;
-    top: 8px;
-    bottom: 8px;
-    width: 1px;
-    background: var(--border-soft);
+    display: none;
   }
 }
 
@@ -757,7 +866,7 @@
 }
 .card-head-icon svg { width: 14px; height: 14px; }
 .card-head-title {
-  font-family: var(--font-unbounded), sans-serif;
+  font-family: var(--font-jakarta), sans-serif;
   font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
   color: var(--text-1);
   margin: 0;
@@ -773,7 +882,7 @@
 }
 
 /* ============================================================
-   HEADINGS — Unbounded display + Plus Jakarta body + JetBrains mono labels
+   HEADINGS — v142: Inter family (serious, cohesive) + JetBrains mono labels
    ============================================================ */
 .eyebrow, .h-eyebrow {
   display: inline-flex;
@@ -792,30 +901,53 @@
 }
 .eyebrow svg, .h-eyebrow svg { width: 12px; height: 12px; }
 
+/* v142: Removed handwritten variant (Caveat) — switched to serious Inter-only
+   font family. The .handwritten class is now a no-op for backward compat. */
+.eyebrow.handwritten, .h-eyebrow.handwritten,
+.h-section.handwritten {
+  /* inherits from parent — no font override */
+}
 .h-display {
-  font-family: var(--font-unbounded), sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  font-size: clamp(26px, 4.2vw, 40px);
+  font-family: var(--font-jakarta), sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  /* v141 Step 7: Slightly larger hero headings (was 4.2vw max 40px) */
+  font-size: clamp(28px, 4.5vw, 44px);
   color: var(--text-1);
   margin: 0 0 16px;
 }
 .h-display .accent {
   color: var(--accent);
+  /* v141 Step 7: Thicker underline for stronger visual emphasis */
   border-bottom: 3px solid var(--accent);
+  padding-bottom: 1px;
 }
 
 .lede {
   color: var(--text-2);
-  font-size: 14.5px;
+  /* v141 Step 7: Slightly larger lede (was 14.5px) for better readability */
+  font-size: 15.5px;
   line-height: 1.65;
-  max-width: 560px;
+  max-width: 580px;
   margin: 0 0 30px;
 }
 
+/* v141 Step 7: New .h-card heading class for card/panel titles.
+   Sits between h-display (hero) and h-section (label) in the hierarchy. */
+.h-card {
+  font-family: var(--font-jakarta), sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-1);
+  margin: 0 0 12px;
+}
+
 .h-section {
-  font-size: 10px;
+  /* v141 Step 7: Slightly larger section label (was 10px) */
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -841,8 +973,15 @@
   flex-direction: column;
   gap: 10px;
   margin-bottom: 18px;
+  /* v143: Center-align items when in row mode (desktop) */
+  align-items: stretch;
 }
-@media (min-width: 560px) { .search-row { flex-direction: row; } }
+@media (min-width: 560px) {
+  .search-row {
+    flex-direction: row;
+    align-items: center;
+  }
+}
 
 .input-wrap {
   position: relative;
@@ -876,7 +1015,9 @@
 .console-input::placeholder, .input::placeholder { color: var(--text-3); }
 .console-input:focus, .input:focus {
   border-color: var(--accent);
-  box-shadow: 4px 4px 0 var(--accent);
+  /* v143: Soft ring focus instead of brutalist 4px offset shadow
+     (which conflicted with rounded corners). */
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 .input.pl-12 { padding-left: 48px; }
 .input-mono {
@@ -906,6 +1047,8 @@
   white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  /* v141 Step 1: Pill-shaped CTA buttons (Tabela-inspired) */
+  border-radius: 9999px;
 }
 .btn-primary:hover, .btn.btn-primary:hover {
   transform: translateY(-2px);
@@ -961,6 +1104,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  /* v141 Step 1: Pill-shaped ghost buttons to match primary */
+  border-radius: 9999px;
 }
 .btn-ghost:hover {
   background: var(--accent-dim);
@@ -1018,7 +1163,7 @@
 .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; }
 
 /* ============================================================
-   TOGGLE PAIR — STIR/Kvitansiya mode toggle, square
+   TOGGLE PAIR — STIR/Kvitansiya mode toggle (v143: pill-shaped)
    ============================================================ */
 .toggle-pair {
   display: inline-flex;
@@ -1027,6 +1172,8 @@
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
   margin-top: 22px;
+  /* v143: pill-shaped container to match tabs */
+  border-radius: 9999px;
 }
 .toggle-btn {
   padding: 9px 18px;
@@ -1040,6 +1187,8 @@
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  /* v143: pill-shaped buttons */
+  border-radius: 9999px;
 }
 .toggle-btn.is-active {
   background: var(--accent);
@@ -1317,9 +1466,33 @@
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
-.money-cell .label svg, .money-cell .lbl svg { width: 10px; height: 10px; flex-shrink: 0; }
+/* v141 Step 8: Enhanced money-cell label icons — accent-colored */
+.money-cell .label svg, .money-cell .lbl svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 0.7;
+}
+/* v141 Step 8: Global metadata label icon enhancement — applies to all .lbl
+   and .label elements inside cards (bill-card, case-card, hearing-card, etc.) */
+.bill-card .lbl svg, .bill-card .label svg,
+.case-card .lbl svg, .case-card .label svg,
+.hearing-card .lbl svg, .hearing-card .label svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+.bill-card:hover .lbl svg, .bill-card:hover .label svg,
+.case-card:hover .lbl svg, .case-card:hover .label svg,
+.hearing-card:hover .lbl svg, .hearing-card:hover .label svg {
+  opacity: 1;
+}
 .money-cell .value, .money-cell .val {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
@@ -1385,9 +1558,20 @@
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
-.info-row .lbl svg, .info-row .label svg { width: 11px; height: 11px; flex-shrink: 0; }
+/* v141 Step 8: Enhanced metadata label icons — bigger, accent-colored */
+.info-row .lbl svg, .info-row .label svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+.info-row:hover .lbl svg, .info-row:hover .label svg {
+  opacity: 1;
+}
 .info-row .val, .info-row .value {
   font-size: 13px;
   font-weight: 500;
@@ -1662,7 +1846,7 @@
   gap: 4px;
 }
 .rating-num, .rating-score {
-  font-family: var(--font-unbounded), sans-serif;
+  font-family: var(--font-jakarta), sans-serif;
   font-size: 60px;
   font-weight: 800;
   color: var(--accent);
@@ -2334,7 +2518,7 @@
   padding: 0 2px;
 }
 .fh-title {
-  font-family: var(--font-unbounded), sans-serif;
+  font-family: var(--font-jakarta), sans-serif;
   font-size: 20px;
   font-weight: 700;
   color: var(--text-1);
@@ -2358,9 +2542,22 @@
   padding: 16px 18px;
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
-  border-left: 3px solid var(--accent);
+  /* v143: Removed border-left accent (conflicted with border-radius).
+     Using a subtle top accent bar via ::before instead. */
   margin-bottom: 18px;
   flex-wrap: wrap;
+  position: relative;
+  overflow: hidden;
+}
+/* v143: Top accent bar (replaces the old border-left) */
+.company-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
 }
 .company-banner .cb-icon {
   width: 36px; height: 36px;
@@ -2370,11 +2567,13 @@
   background: var(--accent);
   color: var(--void);
   flex-shrink: 0;
+  /* v143: rounded icon to match design */
+  border-radius: 10px;
 }
 .company-banner .cb-icon svg { width: 16px; height: 16px; }
 .company-banner .cb-text { min-width: 0; flex: 1; }
 .company-banner .cb-name {
-  font-family: var(--font-unbounded), sans-serif;
+  font-family: var(--font-jakarta), sans-serif;
   font-size: 14px;
   font-weight: 700;
   color: var(--text-1);
@@ -2394,6 +2593,8 @@
   gap: 18px;
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+  /* v143: prevent stats from getting squished by the refresh button */
+  flex-shrink: 0;
 }
 .company-banner .cb-stat {
   display: flex;
@@ -2562,7 +2763,7 @@
   flex-wrap: wrap;
 }
 .role-card .rc-title {
-  font-family: var(--font-unbounded), sans-serif;
+  font-family: var(--font-jakarta), sans-serif;
   font-size: 13px;
   font-weight: 700;
   color: var(--text-1);
@@ -3060,7 +3261,7 @@
 }
 .empty-state .es-icon svg { width: 28px; height: 28px; }
 .empty-state .es-title {
-  font-family: var(--font-unbounded), sans-serif;
+  font-family: var(--font-jakarta), sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: var(--text-1);
@@ -3568,7 +3769,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-unbounded), sans-serif;
+  font-family: var(--font-jakarta), sans-serif;
   font-size: 18px;
   font-weight: 800;
   color: var(--text-3);

@@ -3,7 +3,7 @@ import { getCompanyStats } from '@/lib/stats'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 90
 
 /**
  * GET /api/stats?tin=302678824
@@ -35,14 +35,13 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // 45s overall timeout — gives the v138 improved retry logic (ALL CF Workers
-  // per attempt, 3 attempts, 12s per-worker timeout) room to failover and
-  // still return the full case list. Was 30s, but that was too tight when
-  // 1-2 workers were blipping and the court-case fetcher needed to retry.
+  // 60s overall timeout — gives the v140 parallel-race retry logic (10s first
+  // attempt + 15s retry + 20s final retry = up to 45s per endpoint, all parallel)
+  // room to complete. Was 45s in v139, but the multi-retry approach needs more.
   const timeout = new Promise<{ ok: false; error: string }>((resolve) => {
     setTimeout(
-      () => resolve({ ok: false, error: "So'rov vaqti tugadi (45s). Qayta urinib ko'ring." }),
-      45000,
+      () => resolve({ ok: false, error: "So'rov vaqti tugadi (60s). Qayta urinib ko'ring." }),
+      60000,
     )
   })
 

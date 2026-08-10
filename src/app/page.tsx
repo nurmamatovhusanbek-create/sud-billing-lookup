@@ -2948,7 +2948,7 @@ async function fetchWatchStats(tin: string): Promise<{ total: number; win: numbe
   const cached = getCached<Omit<StatsResponseOk, 'ok'>>(cacheK)
   if (cached) return cached.summary
   const res = await fetch(`/api/stats?tin=${encodeURIComponent(tin)}`, {
-    signal: AbortSignal.timeout(50000),
+    signal: AbortSignal.timeout(70000),
   })
   const json = (await res.json()) as StatsResponseOk | StatsResponseErr
   if (!json.ok) throw new Error(json.error || "Statistikani olib bo'lmadi")
@@ -3630,7 +3630,7 @@ function StatsTab({
       // Phase 1 → 2 after a short tick (so the user sees the "company" step)
       setTimeout(() => setPhase(2), 600)
       const res = await fetch(`/api/stats?tin=${encodeURIComponent(tin)}`, {
-        signal: AbortSignal.timeout(50000),
+        signal: AbortSignal.timeout(70000),
       })
       const json = (await res.json()) as StatsResponseOk | StatsResponseErr
       if (!json.ok) throw new Error(json.error || "Statistikani olib bo'lmadi")
@@ -5333,7 +5333,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v139</p>
+                <p className="brand-sub">v143</p>
               </div>
             </div>
             <div className="header-right">
@@ -5821,9 +5821,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v139">
+        <footer className="app-footer" data-version="v143">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v139</div>
+            <div className="footer-text">Sud Billing Lookup v143</div>
           </div>
         </footer>
       </div>

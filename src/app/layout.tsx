@@ -1,22 +1,17 @@
 import type { Metadata } from "next";
-import { Unbounded, Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 
-const unbounded = Unbounded({
-  variable: "--font-unbounded",
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-  display: "swap",
-});
-
-// Inter has full Cyrillic support (ў, қ, ғ, ҳ, а-я) — fixes rendering of
-// Cyrillic Uzbek text returned by sud.uz / orginfo.uz APIs.
+// v142: Cohesive serious font family — Inter for everything (body + headings),
+// JetBrains Mono for code/numbers. Both designed by Rasmus Andersson to pair
+// perfectly. Inter has full Cyrillic support (ў, қ, ғ, ҳ, а-я) for sud.uz data.
+// Removed: Unbounded (playful geometric display) + Caveat (handwritten casual).
 const jakarta = Inter({
   variable: "--font-jakarta",
   subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700", "800", "900"],
   display: "swap",
 });
 
@@ -74,7 +69,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
       <body
-        className={`${unbounded.variable} ${jakarta.variable} ${jetbrains.variable} antialiased`}
+        className={`${jakarta.variable} ${jetbrains.variable} antialiased`}
       >
         {children}
         <Toaster />

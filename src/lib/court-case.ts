@@ -266,7 +266,10 @@ async function searchCourtCasesInternal(
           signal: AbortSignal.timeout(10000),
         })
         if (!res.ok) {
-          if (res.status === 404 || res.status === 410) {
+          // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
+          // as definitive. Only treat 404 as definitive for non-CONFLICT URLs.
+          const isConflict = url.includes('CONFLICT')
+          if ((res.status === 404 || res.status === 410) && !isConflict) {
             throw new Error(`DEFINITIVE_NOT_FOUND:${res.status}`)
           }
           throw new Error(`HTTP ${res.status}`)
@@ -328,7 +331,8 @@ async function searchCourtCasesInternal(
           signal: AbortSignal.timeout(15000),
         })
         if (!res.ok) {
-          if (res.status === 404 || res.status === 410) throw new Error('DEFINITIVE_NOT_FOUND')
+          const isConflict = url.includes('CONFLICT')
+          if ((res.status === 404 || res.status === 410) && !isConflict) throw new Error('DEFINITIVE_NOT_FOUND')
           throw new Error(`HTTP ${res.status}`)
         }
         const text = await res.text()

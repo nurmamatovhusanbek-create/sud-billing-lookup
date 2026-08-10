@@ -313,7 +313,17 @@ async function fetchCompanyStatsInternal(
     const ct = courtTypes[i]
     if (res.status === 'fulfilled') {
       for (const raw of res.value) {
-        const cwc = classifyCase(raw, ct, companyNameNorm, tin)
+        // v149: Re-classify court type based on case number prefix.
+        // jadval.sud.uz/case/findByTin returns ALL case types (economic + civil + admin),
+        // not just economic. Case number prefixes:
+        //   4- = economic, 2-/3- = civil, 5- = administrative, 1- = criminal
+        let actualCourtType = ct
+        const cn = raw.caseNumber || ''
+        if (cn.startsWith('5-')) actualCourtType = 'administrative'
+        else if (cn.startsWith('2-') || cn.startsWith('3-')) actualCourtType = 'civil'
+        else if (cn.startsWith('4-')) actualCourtType = 'economic'
+
+        const cwc = classifyCase(raw, actualCourtType, companyNameNorm, tin)
         if (cwc) allCases.push(cwc)
       }
     } else {

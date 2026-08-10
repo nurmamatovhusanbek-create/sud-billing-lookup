@@ -28,6 +28,7 @@ import {
 import { getCached, setCached, clearCached, cacheKey } from '@/lib/cache'
 import { DataStrip, DataField } from '@/components/ui-custom/data-strip'
 import { ReceiptView } from '@/components/ui-custom/receipt-view'
+import { Button } from '@/components/ui-custom/button'
 
 // ---- SVG spinner (monochrome — uses var(--accent)) -------------------
 
@@ -747,11 +748,11 @@ function BillsLoadingState({
             return (
               <div key={step.label} className={`phase-step ${isDone ? 'is-done' : ''} ${isCurrent ? 'is-current' : ''}`}>
                 {isDone ? (
-                  <CheckCheck className="w-3 h-3" />
+                  <CheckCheck className="w-3.5 h-3.5" />
                 ) : isCurrent ? (
-                  <step.Icon className="w-3 h-3" />
+                  <step.Icon className="w-3.5 h-3.5" />
                 ) : (
-                  <step.Icon className="w-3 h-3" style={{ opacity: 0.4 }} />
+                  <step.Icon className="w-3.5 h-3.5" style={{ opacity: 0.4 }} />
                 )}
                 <span className="hidden sm:inline">{step.label}</span>
               </div>
@@ -862,11 +863,11 @@ function CourtLoadingState({ value, elapsed }: { value: string; elapsed: number 
           return (
             <div key={step.label} className={`phase-step ${isDone ? 'is-done' : ''} ${isCurrent ? 'is-current' : ''}`}>
               {isDone ? (
-                <CheckCheck className="w-3 h-3" />
+                <CheckCheck className="w-3.5 h-3.5" />
               ) : isCurrent ? (
-                <step.Icon className="w-3 h-3" />
+                <step.Icon className="w-3.5 h-3.5" />
               ) : (
-                <step.Icon className="w-3 h-3" style={{ opacity: 0.4 }} />
+                <step.Icon className="w-3.5 h-3.5" style={{ opacity: 0.4 }} />
               )}
               <span className="hidden sm:inline">{step.label}</span>
             </div>
@@ -892,7 +893,7 @@ function InfoRow({
   return (
     <>
       <dt>
-        {Icon && <Icon className="w-3 h-3" />}
+        {Icon && <Icon className="w-3.5 h-3.5" />}
         {label}
       </dt>
       <dd className={mono ? 'mono' : ''}>
@@ -1004,7 +1005,7 @@ function InstanceView({ title, data }: { title: string; data: InstanceData }) {
       {docCount > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <p className="detail-section-title" style={{ fontSize: 10 }}>
-            <FileText className="w-3 h-3" />
+            <FileText className="w-3.5 h-3.5" />
             Hujjatlar ({docCount})
           </p>
           {documents.map((d, i) => (
@@ -1334,7 +1335,7 @@ function CaseDetailView({
           aria-label="Ish tafsilotlarini PDF sifatida yuklab olish"
           title="PDF sifatida saqlash"
         >
-          <FileText className="w-3 h-3" />
+          <FileText className="w-3.5 h-3.5" />
           <span>PDF</span>
         </button>
       </div>
@@ -1652,7 +1653,7 @@ function UpcomingHearingsTab({ onViewCase }: { onViewCase: (cn: string, courtTyp
       {/* Search hero */}
       <section className="glass anim-fade-up tab-section">
         <div className="eyebrow">
-          <CalendarDays className="w-3 h-3" />
+          <CalendarDays className="w-3.5 h-3.5" />
           <span>O'ZBEKISTON · MY.SUD.UZ</span>
         </div>
         <h2 className="h-display">Rejalashtirilgan <span className="accent">sud majlislari</span></h2>
@@ -1727,7 +1728,7 @@ function UpcomingHearingsTab({ onViewCase }: { onViewCase: (cn: string, courtTyp
                   onClick={(e) => { e.stopPropagation(); handleRemoveCompany(c.tin) }}
                   aria-label="O'chirish"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
@@ -1774,7 +1775,7 @@ function UpcomingHearingsTab({ onViewCase }: { onViewCase: (cn: string, courtTyp
           <div className="panel anim-fade-up tab-section-sm" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div className="inn-bar" style={{ flex: 1, minWidth: 0 }}>
               <div className="inn-left">
-                <div className="inn-icon"><CalendarDays className="w-5 h-5" /></div>
+                <div className="inn-icon"><CalendarDays className="w-4 h-4" /></div>
                 <div>
                   <div className="inn-label">Rejalashtirilgan sud majlislari</div>
                   <div className="inn-value">{selectedTin ? formatTin(selectedTin) : ''} · {hearings.length} ta</div>
@@ -1842,10 +1843,21 @@ function UpcomingHearingCard({
 }) {
   const courtMeta = COURT_TYPES[hearing.courtType?.toUpperCase()]
   return (
-    <article className="panel case-card panel-hover anim-fade-up">
+    <article className="panel case-card hearing-card panel-hover anim-fade-up">
       <div className="bill-head">
         <div className="bill-idx">
-          <span className="idx-num">#{index + 1}</span>
+          {/* v146 §5.3: Docket date block — calendar tear-off style */}
+          {hearing.hearingDate && (() => {
+            const parts = hearing.hearingDate.split('.')
+            const day = parts[0] || ''
+            const month = parts[1] ? TREND_MONTH_ABBR[+month - 1] ?? parts[1] : ''
+            return (
+              <div className="docket-date">
+                <span className="docket-day">{day}</span>
+                <span className="docket-month">{month}</span>
+              </div>
+            )
+          })()}
           <div className="bill-title">
             <div className="receipt">
               <FolderOpen className="w-[18px] h-[18px]" style={{ color: 'var(--text-3)' }} />
@@ -1863,13 +1875,14 @@ function UpcomingHearingCard({
           ) : (
             <span className="badge b-neutral">{hearing.courtTypeLabel}</span>
           )}
-          <button
-            type="button"
-            className="korish-btn"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Eye}
             onClick={() => onViewCase(hearing.caseNumber, hearing.courtType)}
           >
-            <Eye className="w-3 h-3" /> Ko&apos;rish
-          </button>
+            Ko'rish
+          </Button>
         </div>
       </div>
 
@@ -2106,7 +2119,7 @@ function CourtCasesTab({
       {/* Search hero */}
       <section className="glass anim-fade-up tab-section">
         <div className="eyebrow">
-          <Gavel className="w-3 h-3" />
+          <Gavel className="w-3.5 h-3.5" />
           <span>O'ZBEKISTON · MY.SUD.UZ</span>
         </div>
         <h2 className="h-display">Kompaniya ishtirokidagi <span className="accent">sud ishlarini</span> ko'ring</h2>
@@ -2435,7 +2448,7 @@ function CompanyInfoTab({
       {/* Search hero */}
       <section className="glass anim-fade-up tab-section">
         <div className="eyebrow">
-          <Building2 className="w-3 h-3" />
+          <Building2 className="w-3.5 h-3.5" />
           <span>O'ZBEKISTON · ORGINFO.UZ + CHAMBER.UZ</span>
         </div>
         <h2 className="h-display">Kompaniya <span className="accent">ma'lumotlari</span></h2>
@@ -2525,10 +2538,8 @@ function CompanyInfoTab({
                 }}
               >
                 <div className="rating-ring-inner">
-                  <div className="rating-num">
-                    {rating.score}
-                    <span style={{ fontSize: 24, color: 'var(--text-3)' }}>/100</span>
-                  </div>
+                  <div className="rating-num">{rating.score}</div>
+                  <div className="rating-num-suffix">/ 100</div>
                 </div>
               </div>
               <div className="rating-badge">{rating.category}</div>
@@ -2555,15 +2566,15 @@ function CompanyInfoTab({
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 <button type="button" className="btn-ghost btn-sm" onClick={onViewCases}>
-                  <Gavel className="w-3 h-3" />
+                  <Gavel className="w-3.5 h-3.5" />
                   <span>Sud ishlari</span>
                 </button>
                 <button type="button" className="btn-ghost btn-sm" onClick={onViewBills}>
-                  <Receipt className="w-3 h-3" />
+                  <Receipt className="w-3.5 h-3.5" />
                   <span>To&apos;lovlar</span>
                 </button>
                 <button type="button" className="btn-ghost btn-sm" onClick={onViewHearings}>
-                  <CalendarDays className="w-3 h-3" />
+                  <CalendarDays className="w-3.5 h-3.5" />
                   <span>Majlislar</span>
                 </button>
                 {data.company?.orgInfoUrl && (
@@ -2573,7 +2584,7 @@ function CompanyInfoTab({
                     rel="noopener noreferrer"
                     className="btn-ghost btn-sm"
                   >
-                    <ExternalLink className="w-3 h-3" />
+                    <ExternalLink className="w-3.5 h-3.5" />
                     <span>orginfo.uz</span>
                   </a>
                 )}
@@ -2970,7 +2981,7 @@ function WatchlistTab({
       {/* Search hero */}
       <section className="glass anim-fade-up tab-section">
         <div className="eyebrow">
-          <Eye className="w-3 h-3" />
+          <Eye className="w-3.5 h-3.5" />
           <span>O'ZBEKISTON · KO'P KOMPANIYA KUZATUVI</span>
         </div>
         <h2 className="h-display">Kompaniyalarni <span className="accent">kuzating</span></h2>
@@ -3036,7 +3047,7 @@ function WatchlistTab({
               return (
                 <article
                   key={c.tin}
-                  className="watch-card"
+                  className="panel watch-card"
                   onClick={() => onViewInStats(c.tin)}
                   role="button"
                   tabIndex={0}
@@ -3053,7 +3064,7 @@ function WatchlistTab({
                       onClick={(e) => { e.stopPropagation(); handleRemove(c.tin) }}
                       aria-label="O'chirish"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <div className="wc-metrics">
@@ -3062,7 +3073,7 @@ function WatchlistTab({
                       {stats ? (
                         <span className="wc-metric-value">{stats.total}</span>
                       ) : stillLoading ? (
-                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3 h-3" /></span>
+                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3.5 h-3.5" /></span>
                       ) : (
                         <span className="wc-metric-value is-pending">—</span>
                       )}
@@ -3072,7 +3083,7 @@ function WatchlistTab({
                       {winRate !== null ? (
                         <span className="wc-metric-value is-accent">{winRate}%</span>
                       ) : stillLoading ? (
-                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3 h-3" /></span>
+                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3.5 h-3.5" /></span>
                       ) : (
                         <span className="wc-metric-value is-pending">—</span>
                       )}
@@ -3080,7 +3091,7 @@ function WatchlistTab({
                     <div className="wc-metric">
                       <span className="wc-metric-label">Reyting</span>
                       {s.rating === undefined ? (
-                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3 h-3" /></span>
+                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3.5 h-3.5" /></span>
                       ) : s.rating ? (
                         <span className="wc-metric-value is-accent">{s.rating.score}</span>
                       ) : (
@@ -3090,7 +3101,7 @@ function WatchlistTab({
                     <div className="wc-metric">
                       <span className="wc-metric-label">Keyingi majlis</span>
                       {s.nextHearing === undefined ? (
-                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3 h-3" /></span>
+                        <span className="wc-metric-value is-pending"><SvgSpinner className="w-3.5 h-3.5" /></span>
                       ) : s.nextHearing ? (
                         <span className="wc-metric-value" style={{ fontSize: 12 }}>{s.nextHearing}</span>
                       ) : (
@@ -3105,7 +3116,7 @@ function WatchlistTab({
                         <span className="badge solid" style={{ fontSize: 9, height: 18 }}>{s.rating.category}</span>
                       )}
                       <span className="wc-jump">
-                        Statistika <ArrowRight className="w-3 h-3" />
+                        Statistika <ArrowRight className="w-3.5 h-3.5" />
                       </span>
                     </span>
                   </div>
@@ -3246,7 +3257,7 @@ function TrendChart({ timeline, onViewCase }: { timeline: TimelineMonth[]; onVie
                 return (
                   <article
                     key={c.caseNumber + ci}
-                    className="trend-case-card"
+                    className="panel trend-case-card"
                     onClick={() => onViewCase?.(c.caseNumber, c.courtType, c)}
                   >
                     <div className="tcc-head">
@@ -3263,13 +3274,14 @@ function TrendChart({ timeline, onViewCase }: { timeline: TimelineMonth[]; onVie
                     </div>
                     <p className="tcc-result">{c.result !== '—' ? c.result : 'Ko\'rib chiqilmoqda'}</p>
                     <p className="tcc-party">{c.counterparty || '—'}</p>
-                    <button
-                      type="button"
-                      className="korish-btn"
-                      onClick={(e) => { e.stopPropagation(); onViewCase?.(c.caseNumber, c.courtType, c) }}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={Eye}
+                      onClick={(e: any) => { e.stopPropagation(); onViewCase?.(c.caseNumber, c.courtType, c) }}
                     >
-                      <Eye className="w-3 h-3" /> Ko'rish
-                    </button>
+                      Ko'rish
+                    </Button>
                   </article>
                 )
               })}
@@ -3794,7 +3806,7 @@ function StatsTab({
     return (
       <article
         key={c.caseNumber}
-        className="case-card-stats"
+        className="panel case-card-stats"
         onClick={() => handleCaseClick(c)}
         role="button"
         tabIndex={0}
@@ -3914,7 +3926,7 @@ function StatsTab({
   return (
     <section className="glass anim-fade-up tab-section">
       <div className="eyebrow">
-        <BarChart3 className="w-3 h-3" />
+        <BarChart3 className="w-3.5 h-3.5" />
         <span>STATISTIKA · MY.SUD.UZ</span>
       </div>
       <h2 className="h-display">
@@ -4022,22 +4034,22 @@ function StatsTab({
         <div style={{ marginTop: 24 }}>
           <div className="phase-steps">
             <div className={`phase-step ${phase >= 1 ? 'is-active' : ''}`}>
-              <span className="ps-icon">{phase >= 2 ? <CheckCheck className="w-3 h-3" /> : <Loader2 className="w-3 h-3 spin-anim" />}</span>
+              <span className="ps-icon">{phase >= 2 ? <CheckCheck className="w-3.5 h-3.5" /> : <Loader2 className="w-3.5 h-3.5 spin-anim" />}</span>
               orginfo.uz dan kompaniya ma&apos;lumotlari
             </div>
             <div className={`phase-step ${phase >= 2 ? (phase >= 3 ? 'is-done' : 'is-active') : ''}`}>
-              <span className="ps-icon">{phase >= 3 ? <CheckCheck className="w-3 h-3" /> : phase === 2 ? <Loader2 className="w-3 h-3 spin-anim" /> : <Clock className="w-3 h-3" />}</span>
+              <span className="ps-icon">{phase >= 3 ? <CheckCheck className="w-3.5 h-3.5" /> : phase === 2 ? <Loader2 className="w-3.5 h-3.5 spin-anim" /> : <Clock className="w-3.5 h-3.5" />}</span>
               3 sud turidagi ishlar parallel yuklanmoqda (iqtisodiy + fuqarolik + ma&apos;muriy)
             </div>
             <div className={`phase-step ${phase >= 3 ? 'is-done' : ''}`}>
-              <span className="ps-icon">{phase >= 3 ? <CheckCheck className="w-3 h-3" /> : <Clock className="w-3 h-3" />}</span>
+              <span className="ps-icon">{phase >= 3 ? <CheckCheck className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}</span>
               Tasniflash: Yutdi / Yutqazdi / Neitral / Kutilmoqda
             </div>
           </div>
           <div style={{ marginTop: 16 }}>
             {[0, 1, 2].map(i => (
               <div key={i} className="skel-card">
-                <div className="skel-line w-70 h-20" />
+                <div className="skel-line w-8 h-8" />
                 <div className="skel-line w-30" />
                 <div className="skel-line w-90" />
                 <div className="skel-line w-50" />
@@ -4184,44 +4196,44 @@ function StatsTab({
                 </h3>
                 <div className="summary-grid-stats">
                   <article
-                    className="sum-card"
+                    className="panel sum-card"
                     onClick={() => handleSummaryClick('economic', 'all')}
                     role="button"
                     tabIndex={0}
                   >
-                    <p className="sc-label"><FolderOpen className="w-3 h-3" />Jami ishlar</p>
+                    <p className="sc-label"><FolderOpen className="w-3.5 h-3.5" />Jami ishlar</p>
                     <p className="sc-num">{summary.total}</p>
                     <p className="sc-sub">
                       {summary.total > 0 ? `${Math.round(summary.win / summary.total * 100)}% yutdi · ${Math.round(summary.lose / summary.total * 100)}% yutqazdi` : 'ishlar topilmadi'}
                     </p>
                   </article>
                   <article
-                    className="sum-card solid"
+                    className="panel sum-card solid"
                     onClick={() => handleSummaryClick('economic', 'win')}
                     role="button"
                     tabIndex={0}
                   >
-                    <p className="sc-label"><Trophy className="w-3 h-3" />Yutdi</p>
+                    <p className="sc-label"><Trophy className="w-3.5 h-3.5" />Yutdi</p>
                     <p className="sc-num">{summary.win}</p>
                     <p className="sc-sub">{summary.total > 0 ? `${Math.round(summary.win / summary.total * 100)}% · To'liq / Qisman qanoatlantirilgan` : '—'}</p>
                   </article>
                   <article
-                    className="sum-card outline"
+                    className="panel sum-card outline"
                     onClick={() => handleSummaryClick('economic', 'lose')}
                     role="button"
                     tabIndex={0}
                   >
-                    <p className="sc-label"><XCircle className="w-3 h-3" />Yutqazdi</p>
+                    <p className="sc-label"><XCircle className="w-3.5 h-3.5" />Yutqazdi</p>
                     <p className="sc-num">{summary.lose}</p>
                     <p className="sc-sub">{summary.total > 0 ? `${Math.round(summary.lose / summary.total * 100)}% · Rad etilgan / Qaytarilgan` : '—'}</p>
                   </article>
                   <article
-                    className="sum-card surface"
+                    className="panel sum-card surface"
                     onClick={() => handleSummaryClick('civil', 'neutral')}
                     role="button"
                     tabIndex={0}
                   >
-                    <p className="sc-label"><MinusCircle className="w-3 h-3" />Neitral</p>
+                    <p className="sc-label"><MinusCircle className="w-3.5 h-3.5" />Neitral</p>
                     <p className="sc-num">{summary.neutral}</p>
                     <p className="sc-sub">{summary.total > 0 ? `${Math.round(summary.neutral / summary.total * 100)}% · Javobgar sifatida bekor qilingan` : '—'}</p>
                   </article>
@@ -4275,23 +4287,23 @@ function StatsTab({
                         <span className={`cc-name ${isA ? 'is-a' : ''}`} title={name}>{name}</span>
                       </div>
                       <div className="summary-grid-stats" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-                        <article className="sum-card">
-                          <p className="sc-label"><FolderOpen className="w-3 h-3" />Jami</p>
+                        <article className="panel sum-card">
+                          <p className="sc-label"><FolderOpen className="w-3.5 h-3.5" />Jami</p>
                           <p className="sc-num">{s.total}</p>
                           <p className="sc-sub">{s.total > 0 ? `${Math.round(winPct)}% / ${Math.round(losePct)}%` : '\u2014'}</p>
                         </article>
-                        <article className="sum-card solid">
-                          <p className="sc-label"><Trophy className="w-3 h-3" />Yutdi</p>
+                        <article className="panel sum-card solid">
+                          <p className="sc-label"><Trophy className="w-3.5 h-3.5" />Yutdi</p>
                           <p className="sc-num">{s.win}</p>
                           <p className="sc-sub">{s.total > 0 ? `${Math.round(winPct)}%` : '\u2014'}</p>
                         </article>
-                        <article className="sum-card outline">
-                          <p className="sc-label"><XCircle className="w-3 h-3" />Yutqazdi</p>
+                        <article className="panel sum-card outline">
+                          <p className="sc-label"><XCircle className="w-3.5 h-3.5" />Yutqazdi</p>
                           <p className="sc-num">{s.lose}</p>
                           <p className="sc-sub">{s.total > 0 ? `${Math.round(losePct)}%` : '\u2014'}</p>
                         </article>
-                        <article className="sum-card surface">
-                          <p className="sc-label"><MinusCircle className="w-3 h-3" />Neitral</p>
+                        <article className="panel sum-card surface">
+                          <p className="sc-label"><MinusCircle className="w-3.5 h-3.5" />Neitral</p>
                           <p className="sc-num">{s.neutral}</p>
                           <p className="sc-sub">{s.total > 0 ? `${Math.round(neutralPct)}%` : '\u2014'}</p>
                         </article>
@@ -4767,7 +4779,7 @@ function StatsTab({
                       return (
                         <article
                           key={`${h.casenumber}-${i}`}
-                          className="case-card-stats"
+                          className="panel case-card-stats"
                           onClick={() => handleHearingClick(h)}
                           role="button"
                           tabIndex={0}
@@ -5206,7 +5218,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v145</p>
+                <p className="brand-sub">v146</p>
               </div>
             </div>
             <div className="header-right">
@@ -5224,7 +5236,7 @@ export default function Home() {
               >
                 <span className="hidden sm:inline">billing.sud.uz</span>
                 <span className="sm:hidden">sud.uz</span>
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
           </div>
@@ -5279,7 +5291,7 @@ export default function Home() {
             {/* Search hero */}
             <section className="glass anim-fade-up tab-section">
               <div className="eyebrow">
-                <Receipt className="w-3 h-3" />
+                <Receipt className="w-3.5 h-3.5" />
                 <span>O'ZBEKISTON · BILLING.SUD.UZ</span>
               </div>
               <h2 className="h-display">Kompaniya nomiga chiqarilgan barcha <span className="accent">to'lovlarni</span> import qiling</h2>
@@ -5429,7 +5441,7 @@ export default function Home() {
                     className="btn-ghost btn-sm"
                     style={{ marginTop: 8 }}
                   >
-                    <RefreshCw className="w-3 h-3" />
+                    <RefreshCw className="w-3.5 h-3.5" />
                     Qayta urinish
                   </button>
                 </div>
@@ -5455,7 +5467,7 @@ export default function Home() {
                 <div className="panel anim-fade-up tab-section">
                   <div className="inn-bar">
                     <div className="inn-left">
-                      <div className="inn-icon"><Building2 className="w-5 h-5" /></div>
+                      <div className="inn-icon"><Building2 className="w-4 h-4" /></div>
                       <div>
                         <div className="inn-label">Kompaniya STIR raqami</div>
                         <div className="inn-value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -5561,7 +5573,7 @@ export default function Home() {
                           }
                         }}
                       >
-                        <Download className="w-3 h-3" />
+                        <Download className="w-3.5 h-3.5" />
                         <span>Excel</span>
                       </button>
                     </div>
@@ -5694,9 +5706,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v145">
+        <footer className="app-footer" data-version="v146">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v145</div>
+            <div className="footer-text">Sud Billing Lookup v146</div>
           </div>
         </footer>
       </div>

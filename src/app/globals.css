@@ -64,10 +64,14 @@
   --color-popover: var(--void);
   --color-card-foreground: var(--text-1);
   --color-card: var(--panel-bg);
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
+  /* v146 §2.1: Repoint shadcn radius tokens to the --r-* system.
+     Was: all 0 (landmine — would render hard-cornered if anyone uses shadcn).
+     Now: mapped to the real radius tokens so shadcn primitives compose with
+     the custom design system instead of fighting it. */
+  --radius-sm: var(--r-tag);
+  --radius-md: var(--r-field);
+  --radius-lg: var(--r-card);
+  --radius-xl: var(--r-card);
 }
 
 /* ============================================================
@@ -93,6 +97,24 @@
   --r-field: 10px;    /* internal field cells, inputs, nested tiles */
   --r-tag: 7px;       /* badges, chips, filter-chips, icon tiles */
   --r-dot: 50%;       /* status dots, avatar-style marks */
+
+  /* v146 §2.2: Spacing scale (8px-based) — replaces 157 inline styles */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+
+  /* v146 §2.3: Icon scale — 3 sizes, role-based */
+  --icon-sm: 14px;   /* inline with text, badges, chips, small buttons */
+  --icon-md: 18px;   /* standalone action icons, card headers */
+  --icon-lg: 28px;   /* empty states, feature highlights */
+
+  /* v146 §2.5: Motion — single surface easing curve */
+  --ease-surface: cubic-bezier(0.16, 1, 0.3, 1);
 
   --surface: rgba(0,0,0,0.04);
   --surface-2: rgba(0,0,0,0.02);
@@ -1984,16 +2006,33 @@
   border-radius: var(--r-dot);
   background: var(--panel-bg);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* v146 §5.1: overflow hidden as hard backstop */
+  overflow: hidden;
+  padding: 4px;
 }
 .rating-num, .rating-score {
   font-family: var(--font-jakarta), sans-serif;
-  font-size: 60px;
+  /* v146 §5.1: clamp() so 3-digit scores fit inside the 112px circle.
+     Was: fixed 60px (overflowed for 100/100). */
+  font-size: clamp(32px, 8vw, 48px);
   font-weight: 800;
   color: var(--accent);
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+/* v146 §5.1: /100 suffix as separate small label below the score */
+.rating-num-suffix {
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 600;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+  line-height: 1;
 }
 .rating-sub, .rating-score-out {
   color: var(--text-3);
@@ -2813,14 +2852,11 @@
 }
 @media (min-width: 1024px) { .summary-grid-stats { grid-template-columns: repeat(4, 1fr); } }
 
+/* v146 §4: sum-card composes .panel — only adds cursor, padding, and
+   card-specific layout. Background/border/shadow/blur come from .panel. */
 .sum-card {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
   padding: 22px 20px;
   cursor: pointer;
-  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   position: relative;
   overflow: hidden;
   margin-bottom: 0;
@@ -2828,7 +2864,6 @@
 .sum-card:hover {
   transform: translateY(-3px);
   border-color: var(--accent);
-  box-shadow: var(--shadow-3);
 }
 .sum-card .sc-label {
   display: flex;
@@ -3204,15 +3239,10 @@
   gap: 12px;
 }
 
+/* v146 §4: case-card-stats composes .panel — only adds cursor + padding */
 .case-card-stats {
   cursor: pointer;
   padding: 22px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-2);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
   position: relative;
   margin-bottom: 0;
 }
@@ -3220,7 +3250,6 @@
 .case-card-stats:hover {
   transform: translateY(-3px);
   border-color: var(--accent);
-  box-shadow: var(--shadow-3);
 }
 
 .case-head {
@@ -3789,20 +3818,15 @@
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 14px;
 }
+/* v146 §4: watch-card composes .panel — only adds padding + cursor */
 .watch-card {
   position: relative;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
   padding: 18px 18px 16px;
   cursor: pointer;
-  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 .watch-card:hover {
   transform: translateY(-3px);
   border-color: var(--accent);
-  box-shadow: var(--shadow-3);
 }
 .watch-card .wc-head {
   display: flex;
@@ -4360,12 +4384,10 @@
 .trend-month-list::-webkit-scrollbar { width: 4px; }
 .trend-month-list::-webkit-scrollbar-thumb { background: var(--border-strong); }
 
+/* v146 §4: trend-case-card composes .panel — only adds padding + cursor */
 .trend-case-card {
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
   padding: 10px 12px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
   position: relative;
 }
 .trend-case-card:hover {
@@ -4671,4 +4693,141 @@
 }
 [data-theme='dark'] .receipt-claim {
   background: rgba(255,255,255,0.05);
+}
+
+/* ============================================================
+   v146 §3: Unified Button — one primitive, variants via props.
+   Replaces .btn-primary, .btn-ghost, .btn-sm, .btn-icon, .icon-btn,
+   .korish-btn, .copy-btn, .page-btn, .print-btn, .expand-btn.
+   ============================================================ */
+.btn-unified {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  border-radius: var(--r-pill);
+  transition: transform 0.3s var(--ease-surface, cubic-bezier(0.16, 1, 0.3, 1)),
+              box-shadow 0.3s ease, background 0.25s ease, color 0.25s ease,
+              border-color 0.25s ease;
+  flex-shrink: 0;
+}
+.btn-unified:disabled {
+  background: var(--surface-2);
+  color: var(--text-3);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  border: 1px solid var(--border);
+}
+.btn-unified-icon {
+  width: var(--icon-sm, 14px);
+  height: var(--icon-sm, 14px);
+  flex-shrink: 0;
+}
+
+/* Primary — solid accent fill */
+.btn-unified-primary {
+  height: 52px;
+  padding: 0 26px;
+  background: var(--accent);
+  color: var(--void);
+}
+.btn-unified-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px -2px rgba(0,0,0,0.25), 0 8px 24px -6px rgba(0,0,0,0.15);
+}
+
+/* Ghost — transparent with border */
+.btn-unified-ghost {
+  height: 44px;
+  padding: 0 18px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+}
+.btn-unified-ghost:hover:not(:disabled) {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Icon — square-ish icon-only */
+.btn-unified-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  padding: 0;
+}
+.btn-unified-icon:hover:not(:disabled) {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Size: small */
+.btn-unified-sm {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.btn-unified-sm.btn-unified-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.btn-unified-sm .btn-unified-icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* ============================================================
+   v146 §5.3: Hearing card "docket ticket" — date-forward layout.
+   Large date block like a calendar tear-off.
+   ============================================================ */
+.hearing-card .docket-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: var(--space-2, 8px) var(--space-2, 8px);
+  background: var(--accent);
+  color: var(--void);
+  border-radius: var(--r-field);
+  flex-shrink: 0;
+}
+.hearing-card .docket-day {
+  font-family: var(--font-jakarta), sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+.hearing-card .docket-month {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  margin-top: 2px;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+/* v146 §5.5: Stats tile sizing standardization */
+.ct-card {
+  aspect-ratio: auto;
+  min-height: 120px;
 }

@@ -4,7 +4,7 @@ import { getCompanyRating } from '@/lib/chamber'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 20
+export const maxDuration = 30
 
 /**
  * GET /api/company-info?tin=XXXXXXXXX

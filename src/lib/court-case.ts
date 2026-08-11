@@ -74,7 +74,7 @@ function curlFetch(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const args = [
       '--silent', '--show-error',
-      '--max-time', '12',
+      '--max-time', '15',
       '--compressed',
       '-H', 'Accept: application/json, text/plain, */*',
       '-H', 'Accept-Language: en-GB,en;q=0.5',
@@ -90,12 +90,14 @@ function curlFetch(url: string): Promise<string> {
       '--', url,
     ]
 
-    // v149: Use spawn (async, non-blocking, no shell) instead of execSync.
-    // execSync goes through cmd.exe on Windows which breaks shell quoting.
-    // spawn passes args directly to curl — no shell, no quoting issues.
-    const child = spawn('curl', args, {
-      timeout: 15000,
+    // v151: Use spawn with shell:true on Windows for Git Bash compatibility.
+    // Git Bash on Windows (MINGW64) needs shell:true to find 'curl' in PATH.
+    // On Linux/Mac, shell:false is fine.
+    const isWindows = process.platform === 'win32'
+    const child = spawn(isWindows ? 'curl' : 'curl', args, {
+      timeout: 18000,
       windowsHide: true,
+      shell: isWindows, // v151: Windows needs shell to find curl in Git Bash
     })
 
     let stdout = ''
@@ -105,16 +107,27 @@ function curlFetch(url: string): Promise<string> {
     child.stderr.on('data', (data) => { stderr += data.toString() })
 
     child.on('error', (err) => {
-      console.error(`[court-case] curl spawn error: ${err.message}`)
+      console.error(`[court-case] curl spawn error for ${url}: ${err.message}`)
+      // v151: If curl doesn't exist, log clearly
+      if (err.message.includes('ENOENT') || err.message.includes('spawn')) {
+        console.error('[court-case] curl binary not found! Install curl or add to PATH.')
+      }
       reject(new Error(`curl spawn failed: ${err.message}`))
     })
 
     child.on('close', (code) => {
       if (code === 0 && stdout.length > 0) {
+        // v151: Check if response is "not found" text (not JSON)
+        if (stdout.includes('топилмади') || stdout.includes('мавжуд эмас')) {
+          console.log(`[court-case] curl got 'not found' text from ${url} (${stdout.length} bytes)`)
+          reject(new Error('curl: not found text response'))
+          return
+        }
+        console.log(`[court-case] curl got ${stdout.length} bytes from ${url}`)
         resolve(stdout)
       } else {
-        console.error(`[court-case] curl exit code ${code}, stderr: ${stderr.slice(0, 200)}`)
-        reject(new Error(`curl exit ${code}: ${stderr.slice(0, 100) || 'no output'}`))
+        console.error(`[court-case] curl exit code ${code} for ${url}, stderr: ${stderr.slice(0, 200)}, stdout: ${stdout.slice(0, 100)}`)
+        reject(new Error(`curl exit ${code}: ${stderr.slice(0, 100) || stdout.slice(0, 100) || 'no output'}`))
       }
     })
   })

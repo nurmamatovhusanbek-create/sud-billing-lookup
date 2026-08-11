@@ -200,20 +200,8 @@ async function searchCourtCasesInternal(
 
   console.log(`[court-case] searching ${courtType} by ${mode}=${value}`)
 
-  // Build the full proxy chain: CF Workers + public CORS proxies + direct
-  const cfWorkerUrls: string[] = []
-  const multi = process.env.CF_WORKER_URLS
-  if (multi) {
-    for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
-      cfWorkerUrls.push(u.endsWith('/') ? u : u + '/')
-    }
-  }
-  const single = process.env.CF_WORKER_URL
-  if (single) {
-    const normalized = single.endsWith('/') ? single : single + '/'
-    if (!cfWorkerUrls.includes(normalized)) cfWorkerUrls.push(normalized)
-  }
-  const allWorkers = cfWorkerUrls.length > 0 ? cfWorkerUrls : FALLBACK_WORKERS
+  // v150 P3: Use shared cf-worker-pool instead of inline duplicate parsing
+  const allWorkers = _getCfWorkerUrls()
 
   // v140: For each API endpoint, fire ALL proxies in PARALLEL.
   // First valid response wins (Promise.any). This eliminates the 12-48s

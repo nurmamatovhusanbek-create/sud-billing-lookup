@@ -28,6 +28,8 @@ import {
 import { getCached, setCached, clearCached, cacheKey } from '@/lib/cache'
 import { DataStrip, DataField } from '@/components/ui-custom/data-strip'
 import { ReceiptView } from '@/components/ui-custom/receipt-view'
+import { formatSum, formatTin, formatDate, parseCaseDate, instanceLabel, ratingLabel } from '@/components/shared/formatters'
+import { loadRecent, saveRecent, upsertRecent, removeRecent, loadSavedCompanies, saveCompany, removeSavedCompanyFn, loadWatchlist, saveWatchlistEntry, removeWatchlistEntry } from '@/lib/local-lists'
 import { Button } from '@/components/ui-custom/button'
 
 // ---- SVG spinner (monochrome — uses var(--accent)) -------------------
@@ -232,43 +234,6 @@ function HearingStatusBadge({ status }: { status: string | null | undefined }) {
 
 // ---- Helpers ----------------------------------------------------------
 
-function formatSum(t: number | null | undefined): string {
-  const s = (t ?? 0) / 100
-  return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(s)
-}
-function formatTin(tin: string): string {
-  return (tin || '').replace(/(\d{3})(?=\d)/g, '$1 ')
-}
-function formatDate(ts: number | null | undefined): string {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-function parseCaseDate(s: string | null | undefined): number {
-  if (!s) return 0
-  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
-  if (m) return new Date(+m[3], +m[2] - 1, +m[1]).getTime()
-  const t = Date.parse(s)
-  return Number.isNaN(t) ? 0 : t
-}
-function instanceLabel(s: string | null | undefined): string {
-  if (!s) return ''
-  const v = s.toLowerCase()
-  if (v === 'first') return 'birinchi instansiya'
-  if (v === 'appellate') return 'apellyatsiya'
-  if (v === 'cassation') return 'kassatsiya'
-  return `${v} instansiya`
-}
 
 function computeSummary(bills: EnrichedBill[]) {
   let paid = 0, partial = 0, unpaid = 0, other = 0
@@ -348,35 +313,6 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
 const RECENT_KEY = 'sbl:recent-inns'
 const RECENT_MAX = 5
 
-function loadRecent(): { inn: string; lastSearchedAt: string }[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(RECENT_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((x) => x && typeof x.inn === 'string' && typeof x.lastSearchedAt === 'string')
-      .slice(0, RECENT_MAX)
-  } catch {
-    return []
-  }
-}
-function saveRecent(items: { inn: string; lastSearchedAt: string }[]) {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0, RECENT_MAX)))
-  } catch { /* ignore */ }
-}
-function upsertRecent(inn: string) {
-  if (typeof window === 'undefined') return
-  const items = loadRecent().filter((x) => x.inn !== inn)
-  items.unshift({ inn, lastSearchedAt: new Date().toISOString() })
-  saveRecent(items.slice(0, RECENT_MAX))
-}
-function removeRecent(inn: string) {
-  saveRecent(loadRecent().filter((x) => x.inn !== inn))
-}
 
 // ---- Tor status badge (monochrome) -----------------------------------
 
@@ -1533,28 +1469,8 @@ interface SavedCompany {
 
 const SAVED_COMPANIES_KEY = 'sud-saved-companies'
 
-function loadSavedCompanies(): SavedCompany[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(SAVED_COMPANIES_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
 
-function saveCompany(company: SavedCompany) {
-  const list = loadSavedCompanies()
-  if (!list.find((c) => c.tin === company.tin)) {
-    list.unshift(company)
-    localStorage.setItem(SAVED_COMPANIES_KEY, JSON.stringify(list))
-  }
-}
 
-function removeSavedCompanyFn(tin: string) {
-  const list = loadSavedCompanies().filter((c) => c.tin !== tin)
-  localStorage.setItem(SAVED_COMPANIES_KEY, JSON.stringify(list))
-}
 
 // ---- Upcoming Hearings tab ------------------------------------------
 
@@ -2363,21 +2279,6 @@ interface CompanyInfoData {
   } | null
 }
 
-function ratingLabel(type: string): string {
-  const labels: Record<string, string> = {
-    'AAA': 'Yuqori',
-    'AA': 'Yuqori',
-    'A': 'Yuqori',
-    'BBB': "O'rta",
-    'BB': "O'rta",
-    'B': "O'rta",
-    'CCC': 'Qoniqarli',
-    'CC': 'Qoniqarli',
-    'C': 'Qoniqarli',
-    'D': 'Quyi',
-  }
-  return labels[type] || "Noma'lum"
-}
 
 const COMPANY_FEATURE_CARDS: { Icon: LucideIcon; title: string; desc: string; tone: 'accent' | 'emerald' | 'indigo' | 'violet' | 'sky'; }[] = [
   { Icon: Building2,   title: "Kompaniya ma'lumotlari",     desc: "STIR bo'yicha orginfo.uz dan to'liq ma'lumot: nom, manzil, rahbar, status, ustav kapitali, kontaktlar.", tone: 'accent' },
@@ -2795,28 +2696,8 @@ interface WatchlistEntry {
 
 const WATCHLIST_KEY = 'sud-watchlist'
 
-function loadWatchlist(): WatchlistEntry[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(WATCHLIST_KEY)
-    return raw ? (JSON.parse(raw) as WatchlistEntry[]) : []
-  } catch {
-    return []
-  }
-}
 
-function saveWatchlistEntry(e: WatchlistEntry) {
-  const list = loadWatchlist()
-  if (!list.find((c) => c.tin === e.tin)) {
-    list.unshift(e)
-    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list))
-  }
-}
 
-function removeWatchlistEntry(tin: string) {
-  const list = loadWatchlist().filter((c) => c.tin !== tin)
-  localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list))
-}
 
 interface WatchSummary {
   loading: boolean
@@ -5218,7 +5099,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v150</p>
+                <p className="brand-sub">v151</p>
               </div>
             </div>
             <div className="header-right">
@@ -5706,9 +5587,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v150">
+        <footer className="app-footer" data-version="v151">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v150</div>
+            <div className="footer-text">Sud Billing Lookup v151</div>
           </div>
         </footer>
       </div>

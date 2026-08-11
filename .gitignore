@@ -20,3 +20,8 @@ yarn-error.log*
 agent-ctx/
 download/
 upload/
+tor/
+.tor-data/
+.tor-log/
+*.tar.gz
+*.exe

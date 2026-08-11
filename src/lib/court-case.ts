@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { spawn } from 'child_process'
+import { execSync } from 'child_process'
 import ZAI from 'z-ai-web-dev-sdk'
 
 /**
@@ -72,62 +72,44 @@ export { CASE_STATUSES, HEARING_STATUSES, COURT_TYPE_LABELS } from './court-case
  */
 function curlFetch(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const args = [
-      '--silent', '--show-error',
-      '--max-time', '15',
-      '--compressed',
-      '-H', 'Accept: application/json, text/plain, */*',
-      '-H', 'Accept-Language: en-GB,en;q=0.5',
-      '-H', 'Origin: https://my.sud.uz',
-      '-H', 'Referer: https://my.sud.uz/',
-      '-H', 'Sec-Fetch-Dest: empty',
-      '-H', 'Sec-Fetch-Mode: cors',
-      '-H', 'Sec-Fetch-Site: same-site',
-      '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-      '-H', 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"',
-      '-H', 'sec-ch-ua-mobile: ?0',
-      '-H', 'sec-ch-ua-platform: "Windows"',
-      '--', url,
-    ]
-
-    // v152: EXACT same approach as v149 (which the user confirmed worked).
-    // spawn('curl', args) — no shell, no bash, no cmd.exe.
-    // Node.js passes args directly to curl as an array — no quoting issues.
-    const child = spawn('curl', args, {
-      timeout: 18000,
-      windowsHide: true,
-    })
-
-    let stdout = ''
-    let stderr = ''
-
-    child.stdout.on('data', (data) => { stdout += data.toString() })
-    child.stderr.on('data', (data) => { stderr += data.toString() })
-
-    child.on('error', (err) => {
-      console.error(`[court-case] curl spawn error for ${url}: ${err.message}`)
-      // v151: If curl doesn't exist, log clearly
-      if (err.message.includes('ENOENT') || err.message.includes('spawn')) {
-        console.error('[court-case] curl binary not found! Install curl or add to PATH.')
+    try {
+      const args = [
+        '--silent', '--show-error',
+        '--max-time', '15',
+        '--compressed',
+        '-H', 'Accept: application/json, text/plain, */*',
+        '-H', 'Accept-Language: en-GB,en;q=0.5',
+        '-H', 'Origin: https://my.sud.uz',
+        '-H', 'Referer: https://my.sud.uz/',
+        '-H', 'Sec-Fetch-Dest: empty',
+        '-H', 'Sec-Fetch-Mode: cors',
+        '-H', 'Sec-Fetch-Site: same-site',
+        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+        '-H', 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"',
+        '-H', 'sec-ch-ua-mobile: ?0',
+        '-H', 'sec-ch-ua-platform: "Windows"',
+        '--', url,
+      ]
+      // v152: Use execSync — runs through bash (Git Bash) which finds MSYS2's
+      // /usr/bin/curl. That curl has a TLS fingerprint jadval.sud.uz accepts.
+      // spawn('curl') finds C:\Windows\System32\curl.exe which gets blocked.
+      // The user confirmed execSync works ("goddamn it worked!").
+      // Yes it blocks the event loop briefly, but that's acceptable.
+      const result = execSync(`curl ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, {
+        timeout: 18000,
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024,
+      })
+      if (result.includes('топилмади') || result.includes('мавжуд эмас')) {
+        reject(new Error('curl: not found text response'))
+        return
       }
-      reject(new Error(`curl spawn failed: ${err.message}`))
-    })
-
-    child.on('close', (code) => {
-      if (code === 0 && stdout.length > 0) {
-        // v151: Check if response is "not found" text (not JSON)
-        if (stdout.includes('топилмади') || stdout.includes('мавжуд эмас')) {
-          console.log(`[court-case] curl got 'not found' text from ${url} (${stdout.length} bytes)`)
-          reject(new Error('curl: not found text response'))
-          return
-        }
-        console.log(`[court-case] curl got ${stdout.length} bytes from ${url}`)
-        resolve(stdout)
-      } else {
-        console.error(`[court-case] curl exit code ${code} for ${url}, stderr: ${stderr.slice(0, 200)}, stdout: ${stdout.slice(0, 100)}`)
-        reject(new Error(`curl exit ${code}: ${stderr.slice(0, 100) || stdout.slice(0, 100) || 'no output'}`))
-      }
-    })
+      console.log(`[court-case] curl got ${result.length} bytes from ${url}`)
+      resolve(result)
+    } catch (e: any) {
+      console.error(`[court-case] curl error for ${url}: ${e?.message?.slice(0, 200)}`)
+      reject(new Error(e?.message || 'curl failed'))
+    }
   })
 }
 

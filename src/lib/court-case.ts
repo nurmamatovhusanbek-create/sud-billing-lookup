@@ -90,10 +90,15 @@ function curlFetch(url: string): Promise<string> {
       '--', url,
     ]
 
-    // v152: Do NOT use shell:true — cmd.exe splits header values on spaces.
-    // Windows 10+ ships curl.exe in C:\Windows\System32, so plain spawn finds it.
-    // If curl is not in PATH (older Windows), the error handler logs it clearly.
-    const child = spawn('curl', args, {
+    // v152: Run curl through bash (not cmd.exe, not bare spawn).
+    // On Windows, spawn('curl') finds C:\Windows\System32\curl.exe which has
+    // a DIFFERENT TLS fingerprint than Git Bash's MSYS2 curl. jadval.sud.uz
+    // blocks the Windows curl TLS fingerprint but allows MSYS2 curl's.
+    // Running through bash ensures MSYS2's curl is used (the one that worked
+    // when the user said "goddamn it worked!").
+    // On Linux/Mac, bash is the default shell and this works identically.
+    const curlCommand = args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')
+    const child = spawn('bash', ['-c', `curl ${curlCommand}`], {
       timeout: 18000,
       windowsHide: true,
     })

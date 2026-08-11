@@ -3,6 +3,9 @@ import { getFullBillData, getBillStatus, type EnrichedBill, type Phase } from '@
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+// maxDuration=120 — bill enrichment (60+ receipts × status fetch) can take 60-90s.
+// Requires Vercel Pro plan (60s) or Fluid/Enterprise (300s+). On Hobby (10s cap),
+// long lookups will time out. For self-hosted (bun/node), this is a no-op.
 export const maxDuration = 120
 
 /**

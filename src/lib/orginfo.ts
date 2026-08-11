@@ -33,32 +33,11 @@ const TIN_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
 // configured (so the app still works in dev without .env, but production
 // must always have CF_WORKER_URLS set).
 
-let orginfoWorkerCounter = 0
-// Hardcoded fallback workers — used if .env CF_WORKER_URLS is missing.
-// This prevents "via direct" (IP blocking) when .env gets lost.
-const FALLBACK_WORKERS = [
-  'https://broad-field-f2b0.uzwebfox.workers.dev/',
-  'https://wild-hall-04ae.uzwebfox.workers.dev/',
-  'https://orange-darkness-8843.najimsheikh071.workers.dev/',
-  'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
-]
+// v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic
+import { createWorkerPool } from './cf-worker-pool'
+const _workerPool = createWorkerPool()
 function getCfWorkerUrl(url: string): string {
-  const urls: string[] = []
-  const multi = process.env.CF_WORKER_URLS
-  if (multi) {
-    for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
-      urls.push(u.endsWith('/') ? u : u + '/')
-    }
-  }
-  const single = process.env.CF_WORKER_URL
-  if (single) {
-    const normalized = single.endsWith('/') ? single : single + '/'
-    if (!urls.includes(normalized)) urls.push(normalized)
-  }
-  if (urls.length === 0) { return FALLBACK_WORKERS[0] + url; }
-  const worker = urls[orginfoWorkerCounter % urls.length]
-  orginfoWorkerCounter++
-  return worker + url
+  return _workerPool.nextProxyUrl(url)
 }
 
 export interface CompanyInfo {

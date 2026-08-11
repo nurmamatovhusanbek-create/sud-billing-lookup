@@ -39,27 +39,11 @@ export interface ChamberRating {
 
 // ---- CF Worker proxy helper ----------------------------------------------
 
-let chamberWorkerCounter = 0
-// Hardcoded fallback workers — used if .env CF_WORKER_URLS is missing.
-// This prevents "via direct" (IP blocking) when .env gets lost.
-const FALLBACK_WORKERS = [
-  'https://broad-field-f2b0.uzwebfox.workers.dev/',
-  'https://wild-hall-04ae.uzwebfox.workers.dev/',
-  'https://orange-darkness-8843.najimsheikh071.workers.dev/',
-  'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
-]
+// v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic
+import { createWorkerPool } from './cf-worker-pool'
+const _workerPool = createWorkerPool()
 function getCfWorkerUrl(url: string): string {
-  const urls: string[] = []
-  const multi = process.env.CF_WORKER_URLS
-  if (multi) {
-    for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
-      urls.push(u.endsWith('/') ? u : u + '/')
-    }
-  }
-  if (urls.length === 0) return FALLBACK_WORKERS[0] + url
-  const worker = urls[chamberWorkerCounter % urls.length]
-  chamberWorkerCounter++
-  return worker + url
+  return _workerPool.nextProxyUrl(url)
 }
 
 // ---- API -----------------------------------------------------------------

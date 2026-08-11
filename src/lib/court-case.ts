@@ -19,65 +19,30 @@ import ZAI from 'z-ai-web-dev-sdk'
 const JADVAL_API = 'https://jadval.sud.uz'
 const JADVALAPI = 'https://jadvalapi.sud.uz'
 
-// ---- CF Worker proxy helper (avoids IP blocking, same as billing.ts) ----
-let courtWorkerCounter = 0
-// Hardcoded fallback workers — used if .env CF_WORKER_URLS is missing.
-// This prevents "via direct" (IP blocking) when .env gets lost.
-const FALLBACK_WORKERS = [
-  'https://broad-field-f2b0.uzwebfox.workers.dev/',
-  'https://wild-hall-04ae.uzwebfox.workers.dev/',
-  'https://orange-darkness-8843.najimsheikh071.workers.dev/',
-  'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
-]
+// v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic
+import { createWorkerPool, getCfWorkerUrls as _getCfWorkerUrls } from './cf-worker-pool'
+const _workerPool = createWorkerPool()
 
-// v144: Removed all public CORS proxies (cors.sh, allorigins, corsproxy.io,
-// codetabs). User requested: ONLY CF Workers, no other proxies.
+// v144: Removed all public CORS proxies. User requested: ONLY CF Workers.
 const PUBLIC_CORS_PROXIES: { prefix: string; needsEncoding: boolean }[] = []
 
 /**
  * Build the full list of proxy URLs to try for a given target URL.
- * v144: CF Workers ONLY (no public CORS proxies, no direct fetch).
- * Order: CF Workers (env or fallback) only.
- * The direct fetch is the last resort — it works when the sandbox has direct
- * connectivity to the origin (sometimes it does, sometimes it's IP-blocked).
+ * v150: Uses shared cf-worker-pool.ts for CF Worker URL parsing.
  */
 function buildProxyChain(targetUrl: string): { url: string; label: string }[] {
   const chain: { url: string; label: string }[] = []
-
-  // 1. CF Workers
-  const cfWorkerUrls: string[] = []
-  const multi = process.env.CF_WORKER_URLS
-  if (multi) {
-    for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
-      cfWorkerUrls.push(u.endsWith('/') ? u : u + '/')
-    }
-  }
-  const single = process.env.CF_WORKER_URL
-  if (single) {
-    const normalized = single.endsWith('/') ? single : single + '/'
-    if (!cfWorkerUrls.includes(normalized)) cfWorkerUrls.push(normalized)
-  }
-  const workers = cfWorkerUrls.length > 0 ? cfWorkerUrls : FALLBACK_WORKERS
+  const workers = _getCfWorkerUrls()
   for (const w of workers) {
     chain.push({ url: w + targetUrl, label: 'CF Worker' })
   }
-
-  // 2. Public CORS proxies (v144: empty list — removed per user request)
-  for (const p of PUBLIC_CORS_PROXIES) {
-    const proxiedUrl = p.needsEncoding ? p.prefix + encodeURIComponent(targetUrl) : p.prefix + targetUrl
-    chain.push({ url: proxiedUrl, label: 'CORS proxy' })
-  }
-
-  // v144: Removed direct fetch — user wants ONLY CF Workers.
-  // If all workers fail, the retry logic handles it.
-
+  // Direct fetch as last resort in the parallel race
+  chain.push({ url: targetUrl, label: 'direct' })
   return chain
 }
 
 function getCfWorkerUrl(url: string): string {
-  // Legacy helper kept for fetchJadvalApiDetails / fetchJadvalDetails.
-  const chain = buildProxyChain(url)
-  return chain[0].url
+  return _workerPool.nextProxyUrl(url)
 }
 
 // ---- Types (re-exported from court-case-types.ts) ----

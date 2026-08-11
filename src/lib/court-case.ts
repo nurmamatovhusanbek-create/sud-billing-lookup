@@ -90,14 +90,12 @@ function curlFetch(url: string): Promise<string> {
       '--', url,
     ]
 
-    // v151: Use spawn with shell:true on Windows for Git Bash compatibility.
-    // Git Bash on Windows (MINGW64) needs shell:true to find 'curl' in PATH.
-    // On Linux/Mac, shell:false is fine.
-    const isWindows = process.platform === 'win32'
-    const child = spawn(isWindows ? 'curl' : 'curl', args, {
+    // v152: Do NOT use shell:true — cmd.exe splits header values on spaces.
+    // Windows 10+ ships curl.exe in C:\Windows\System32, so plain spawn finds it.
+    // If curl is not in PATH (older Windows), the error handler logs it clearly.
+    const child = spawn('curl', args, {
       timeout: 18000,
       windowsHide: true,
-      shell: isWindows, // v151: Windows needs shell to find curl in Git Bash
     })
 
     let stdout = ''

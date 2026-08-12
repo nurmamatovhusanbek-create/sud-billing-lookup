@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   keywords: ["billing.sud.uz", "sud billing", "kvitansiya", "davlat boji", "INN", "STIR", "yuridik shaxs", "Uzbekistan court fees"],
   authors: [{ name: "Sud Billing Lookup" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
   openGraph: {
     title: "Sud To'lovlarini Qidiruv",

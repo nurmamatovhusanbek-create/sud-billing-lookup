@@ -94,15 +94,17 @@ function curlFetch(url: string): Promise<string> {
         '-H', 'sec-ch-ua-platform: "Windows"',
         '--', url,
       ]
-      // v152: Use execSync — runs through bash (Git Bash) which finds MSYS2's
-      // /usr/bin/curl. That curl has a TLS fingerprint jadval.sud.uz accepts.
-      // spawn('curl') finds C:\Windows\System32\curl.exe which gets blocked.
-      // The user confirmed execSync works ("goddamn it worked!").
-      // Yes it blocks the event loop briefly, but that's acceptable.
+      // v155: Force bash as the shell for execSync.
+      // On Windows, execSync defaults to cmd.exe which splits header values
+      // on spaces ("Could not resolve host: application"). By forcing bash,
+      // the single-quote wrapping works correctly AND it finds MSYS2's curl
+      // (not Windows curl.exe) which has the TLS fingerprint jadval.sud.uz
+      // accepts.
       const result = execSync(`curl ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, {
         timeout: 18000,
         encoding: 'utf-8',
         maxBuffer: 10 * 1024 * 1024,
+        shell: process.env.SHELL || (process.platform === 'win32' ? 'bash' : undefined),
       })
       if (result.includes('топилмади') || result.includes('мавжуд эмас')) {
         reject(new Error('curl: not found text response'))

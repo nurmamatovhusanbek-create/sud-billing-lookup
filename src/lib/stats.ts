@@ -17,7 +17,7 @@
  * attached for the failed one — the request never fails wholesale.
  */
 
-import { searchCourtCases, type CourtCase } from './court-case'
+import { searchCourtCasesDetailed, type CourtCase } from './court-case'
 import { getCompanyByTin } from './orginfo'
 import { getCompanyRating } from './chamber'
 
@@ -262,7 +262,10 @@ async function fetchCompanyStatsInternal(
   const [orginfoResult, chamberResult, ...courtResults] = await Promise.allSettled([
     getCompanyByTin(tin).catch(e => { throw e }),
     getCompanyRating(tin),
-    ...courtTypes.map(ct => searchCourtCases(ct, 'tin', tin)),
+    // v153: searchCourtCasesDetailed (not searchCourtCases) — also reports
+    // `incomplete` when a source failed on every proxy/retry, so we can warn
+    // instead of silently returning a too-low total. See court-case.ts.
+    ...courtTypes.map(ct => searchCourtCasesDetailed(ct, 'tin', tin)),
   ])
 
   // Process orginfo result (non-blocking — fallback to chamber.uz, then TIN)
@@ -312,7 +315,19 @@ async function fetchCompanyStatsInternal(
   courtResults.forEach((res, i) => {
     const ct = courtTypes[i]
     if (res.status === 'fulfilled') {
-      for (const raw of res.value) {
+      const { cases: rawCases, incomplete } = res.value
+      // v153: A source failed on every proxy + retry (couldn't confirm
+      // real case count) — surface it instead of staying silent. This is
+      // what used to happen invisibly whenever jadval.sud.uz / jadvalapi.sud.uz
+      // was unreachable from the user's network: the total just looked low,
+      // with no indication the data was incomplete.
+      if (incomplete) {
+        errors.push({
+          courtType: ct,
+          error: "Ba'zi manbalarga ulanib bo'lmadi — natija to'liq bo'lmasligi mumkin (qayta urinib ko'ring)",
+        })
+      }
+      for (const raw of rawCases) {
         // v149: Re-classify court type based on case number prefix.
         // jadval.sud.uz/case/findByTin returns ALL case types (economic + civil + admin),
         // not just economic. Case number prefixes:

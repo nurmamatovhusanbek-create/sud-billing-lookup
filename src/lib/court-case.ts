@@ -20,8 +20,12 @@ const JADVAL_API = 'https://jadval.sud.uz'
 const JADVALAPI = 'https://jadvalapi.sud.uz'
 
 // v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic
-import { createWorkerPool, getCfWorkerUrls as _getCfWorkerUrls } from './cf-worker-pool'
+import { createWorkerPool, getCfWorkerUrls as _getCfWorkerUrls, OriginHealthPool } from './cf-worker-pool'
 const _workerPool = createWorkerPool()
+
+// v154: Health-tracked worker selection, shared across all court-case lookups
+// in this process. See OriginHealthPool's doc comment in cf-worker-pool.ts.
+const workerHealth = new OriginHealthPool('court-case')
 
 // v144: Removed all public CORS proxies. User requested: ONLY CF Workers.
 const PUBLIC_CORS_PROXIES: { prefix: string; needsEncoding: boolean }[] = []
@@ -127,31 +131,22 @@ function curlFetch(url: string): Promise<string> {
  * the same TIN.
  */
 interface CourtCaseCacheEntry {
-  result: Promise<CourtCase[]>
+  result: Promise<{ cases: CourtCase[]; incomplete: boolean }>
   ts: number
 }
 const courtCaseCache = new Map<string, CourtCaseCacheEntry>()
 const COURT_CASE_CACHE_TTL = 60 * 1000 // 60 seconds
 
 /**
- * Search court cases. Calls both jadval.sud.uz and jadvalapi.sud.uz and merges
- * the results (the Angular frontend does the same).
- *
- * - Economic: findByTin (by INN) or findByNumber (by case number)
- * - Civil: findByNumber (by case number) or findByPinfl (by PINFL)
- * - Criminal: findByCriminalNumber
- * - Administrative: findByAdmNumber or findByTin
- *
- * v140 ARCHITECTURE: PARALLEL RACE instead of sequential failover.
- * Fires ALL CF Workers + public CORS proxies + direct fetch SIMULTANEOUSLY.
- * First valid response wins (Promise.any). If ANY worker is alive, we get
- * data in 1-3s instead of 12-48s with sequential failover.
+ * v153: Shared cache-lookup + fetch, used by both searchCourtCases and
+ * searchCourtCasesDetailed below, so they always share the SAME in-flight
+ * fetch/cache entry — calling both for the same TIN never double-fetches.
  */
-export async function searchCourtCases(
+function getCourtCasesCached(
   courtType: CourtType,
   mode: SearchMode,
   value: string,
-): Promise<CourtCase[]> {
+): Promise<{ cases: CourtCase[]; incomplete: boolean }> {
   // Case numbers use "@" instead of "/" in the URL
   const encodedValue = mode === 'caseNumber' ? value.replace('/', '@') : value
 
@@ -179,6 +174,53 @@ export async function searchCourtCases(
 }
 
 /**
+ * Search court cases. Calls both jadval.sud.uz and jadvalapi.sud.uz and merges
+ * the results (the Angular frontend does the same).
+ *
+ * - Economic: findByTin (by INN) or findByNumber (by case number)
+ * - Civil: findByNumber (by case number) or findByPinfl (by PINFL)
+ * - Criminal: findByCriminalNumber
+ * - Administrative: findByAdmNumber or findByTin
+ *
+ * v140 ARCHITECTURE: PARALLEL RACE instead of sequential failover.
+ * Fires ALL CF Workers + public CORS proxies + direct fetch SIMULTANEOUSLY.
+ * First valid response wins (Promise.any). If ANY worker is alive, we get
+ * data in 1-3s instead of 12-48s with sequential failover.
+ *
+ * Public contract is unchanged (resolves to the case list only). Callers that
+ * need to know whether the result may be INCOMPLETE — i.e. some underlying
+ * endpoint failed on every proxy + retry, so "0 extra cases" might mean
+ * "couldn't reach the source" rather than "confirmed no cases" — should use
+ * searchCourtCasesDetailed instead (used by the Stats tab).
+ */
+export async function searchCourtCases(
+  courtType: CourtType,
+  mode: SearchMode,
+  value: string,
+): Promise<CourtCase[]> {
+  const { cases } = await getCourtCasesCached(courtType, mode, value)
+  return cases
+}
+
+/**
+ * v153: Same lookup as searchCourtCases, but also reports `incomplete: true`
+ * when at least one endpoint (jadval.sud.uz or jadvalapi.sud.uz) exhausted
+ * every CF Worker + direct/curl attempt across all 3 retry tiers without a
+ * single success. Before this, that failure mode silently resolved to `[]`
+ * indistinguishable from a genuine "no cases", so the Stats tab's own
+ * partial-data warning banner never fired even when a whole data source was
+ * unreachable — the user just saw a too-low total with no explanation.
+ * Shares the same cache as searchCourtCases, so using both costs one fetch.
+ */
+export async function searchCourtCasesDetailed(
+  courtType: CourtType,
+  mode: SearchMode,
+  value: string,
+): Promise<{ cases: CourtCase[]; incomplete: boolean }> {
+  return getCourtCasesCached(courtType, mode, value)
+}
+
+/**
  * Internal fetch logic — uses PARALLEL RACE to fetch from all proxies
  * simultaneously. First valid response wins.
  */
@@ -187,7 +229,7 @@ async function searchCourtCasesInternal(
   mode: SearchMode,
   value: string,
   encodedValue: string,
-): Promise<CourtCase[]> {
+): Promise<{ cases: CourtCase[]; incomplete: boolean }> {
   // Determine the API paths based on court type and search mode
   const apiConfig = getApiConfig(courtType, mode, encodedValue)
 
@@ -200,25 +242,44 @@ async function searchCourtCasesInternal(
   // First valid response wins (Promise.any). This eliminates the 12-48s
   // sequential failover delay — if ANY proxy is alive, we get data in 1-3s.
   const promises = apiConfig.map(async ({ url, mapper }) => {
+    let originKey: string
+    try { originKey = new URL(url).hostname } catch { originKey = url }
+
+    // v154: Only race workers not currently in cooldown against THIS origin —
+    // see OriginHealthPool doc comment. Always non-empty (fails open).
+    const raceWorkers = workerHealth.getRaceCandidates(originKey, allWorkers)
+
     // Build all proxy URLs for this endpoint
-    const proxyUrls: { url: string; label: string }[] = []
-    for (const w of allWorkers) {
-      proxyUrls.push({ url: w + url, label: 'CF Worker' })
+    const proxyUrls: { url: string; label: string; worker: string | null }[] = []
+    for (const w of raceWorkers) {
+      proxyUrls.push({ url: w + url, label: 'CF Worker', worker: w })
     }
     for (const p of PUBLIC_CORS_PROXIES) {
       const proxiedUrl = p.needsEncoding ? p.prefix + encodeURIComponent(url) : p.prefix + url
-      proxyUrls.push({ url: proxiedUrl, label: 'CORS proxy' })
+      proxyUrls.push({ url: proxiedUrl, label: 'CORS proxy', worker: null })
     }
     // Direct fetch as last resort in the parallel race
-    proxyUrls.push({ url, label: 'direct' })
+    proxyUrls.push({ url, label: 'direct', worker: null })
 
     // v149: For jadval.sud.uz, ALSO add curl-based fetch (bypasses TLS fingerprinting)
     const isJadvalSudUz = url.includes('jadval.sud.uz')
 
+    // Record a worker's outcome. A confirmed "not found" counts as a SUCCESS —
+    // it proves the worker reached the origin fine, it just found no data.
+    // Only transport-level failures count against a worker's health.
+    function recordOutcome(worker: string | null, ok: boolean, msg?: string) {
+      if (!worker) return
+      if (ok || msg?.startsWith('DEFINITIVE_NOT_FOUND')) {
+        workerHealth.markSuccess(originKey, worker)
+      } else {
+        workerHealth.markFailed(originKey, worker)
+      }
+    }
+
     // v140: PARALLEL RACE with BEST-OF fallback.
     // Fire ALL proxies simultaneously. Take the first valid response.
     // 10s timeout per request.
-    const fetchPromises = proxyUrls.map(async ({ url: proxyUrl, label }) => {
+    const fetchPromises = proxyUrls.map(async ({ url: proxyUrl, label, worker }) => {
       try {
         const res = await fetch(proxyUrl, {
           headers: {
@@ -241,9 +302,11 @@ async function searchCourtCasesInternal(
         const text = await res.text()
         const data = JSON.parse(text)
         const items = Array.isArray(data) ? data : (data.data || [])
+        recordOutcome(worker, true)
         return items.map(mapper)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
+        recordOutcome(worker, false, msg)
         throw new Error(msg)
       }
     })
@@ -269,7 +332,7 @@ async function searchCourtCasesInternal(
     for (const r of allSettled) {
       if (r.status === 'rejected' && r.reason?.message?.startsWith('DEFINITIVE_NOT_FOUND')) {
         console.log(`[court-case] ${url} — definitive not-found, returning []`)
-        return []
+        return { items: [] as CourtCase[], failed: false }
       }
     }
 
@@ -280,36 +343,44 @@ async function searchCourtCasesInternal(
 
     if (successes.length === 0) {
       // All failed — retry
-      console.log(`[court-case] ${url} — all ${proxyUrls.length} proxies failed, retrying with 15s timeout...`)
+      console.log(`[court-case] ${url} — all ${proxyUrls.length} proxies failed (health: ${workerHealth.stats(originKey)}), retrying with 15s timeout...`)
       await new Promise(r => setTimeout(r, 500))
 
-      const retryPromises = proxyUrls.map(async ({ url: proxyUrl }) => {
-        const res = await fetch(proxyUrl, {
-          headers: {
-            Accept: 'application/json, text/plain, */*',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-            'Origin': 'https://my.sud.uz',
-            'Referer': 'https://my.sud.uz/',
-            'Referer': 'https://my.sud.uz/',
-          },
-          signal: AbortSignal.timeout(15000),
-        })
-        if (!res.ok) {
-          const isConflict = url.includes('CONFLICT')
-          if ((res.status === 404 || res.status === 410) && !isConflict) throw new Error('DEFINITIVE_NOT_FOUND')
-          throw new Error(`HTTP ${res.status}`)
+      const retryPromises = proxyUrls.map(async ({ url: proxyUrl, worker }) => {
+        try {
+          const res = await fetch(proxyUrl, {
+            headers: {
+              Accept: 'application/json, text/plain, */*',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+              'Origin': 'https://my.sud.uz',
+              'Referer': 'https://my.sud.uz/',
+            },
+            signal: AbortSignal.timeout(15000),
+          })
+          if (!res.ok) {
+            const isConflict = url.includes('CONFLICT')
+            if ((res.status === 404 || res.status === 410) && !isConflict) {
+              throw new Error('DEFINITIVE_NOT_FOUND')
+            }
+            throw new Error(`HTTP ${res.status}`)
+          }
+          const text = await res.text()
+          // v140: Don't treat text 'not found' as definitive (IP blocking issue)
+          const data = JSON.parse(text)
+          const items = Array.isArray(data) ? data : (data.data || [])
+          recordOutcome(worker, true)
+          return items.map(mapper)
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          recordOutcome(worker, false, msg)
+          throw new Error(msg)
         }
-        const text = await res.text()
-        // v140: Don't treat text 'not found' as definitive (IP blocking issue)
-        const data = JSON.parse(text)
-        const items = Array.isArray(data) ? data : (data.data || [])
-        return items.map(mapper)
       })
 
       const retrySettled = await Promise.allSettled(retryPromises)
       for (const r of retrySettled) {
         if (r.status === 'rejected' && r.reason?.message?.startsWith('DEFINITIVE_NOT_FOUND')) {
-          return []
+          return { items: [] as CourtCase[], failed: false }
         }
       }
       const retrySuccesses: CourtCase[][] = retrySettled
@@ -318,25 +389,36 @@ async function searchCourtCasesInternal(
 
       if (retrySuccesses.length === 0) {
         // Final retry with 20s timeout
-        console.log(`[court-case] ${url} — retry failed, final attempt with 20s timeout...`)
+        console.log(`[court-case] ${url} — retry failed (health: ${workerHealth.stats(originKey)}), final attempt with 20s timeout...`)
         await new Promise(r => setTimeout(r, 500))
-        const finalPromises = allWorkers.map(async (w) => {
-          const res = await fetch(w + url, {
-            headers: {
-              Accept: 'application/json, text/plain, */*',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-            'Origin': 'https://my.sud.uz',
-            'Referer': 'https://my.sud.uz/',
-              'Referer': 'https://my.sud.uz/',
-            },
-            signal: AbortSignal.timeout(20000),
-          })
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const text = await res.text()
-          // v140: Don't treat text 'not found' as definitive (IP blocking issue)
-          const data = JSON.parse(text)
-          const items = Array.isArray(data) ? data : (data.data || [])
-          return items.map(mapper)
+        // v154: Re-check candidates — a worker marked dead during this same
+        // request (e.g. timed out in the 10s tier) is excluded here too,
+        // unless everything is dead, in which case we fail open and try all.
+        const finalWorkers = workerHealth.getRaceCandidates(originKey, allWorkers)
+        const finalPromises = finalWorkers.map(async (w) => {
+          try {
+            const res = await fetch(w + url, {
+              headers: {
+                Accept: 'application/json, text/plain, */*',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+                'Origin': 'https://my.sud.uz',
+                'Referer': 'https://my.sud.uz/',
+              },
+              signal: AbortSignal.timeout(20000),
+            })
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status}`)
+            }
+            const text = await res.text()
+            // v140: Don't treat text 'not found' as definitive (IP blocking issue)
+            const data = JSON.parse(text)
+            const items = Array.isArray(data) ? data : (data.data || [])
+            recordOutcome(w, true)
+            return items.map(mapper)
+          } catch (e) {
+            recordOutcome(w, false)
+            throw e
+          }
         })
         const finalSettled = await Promise.allSettled(finalPromises)
         const finalSuccesses: CourtCase[][] = finalSettled
@@ -346,31 +428,37 @@ async function searchCourtCasesInternal(
           // Take the best (most cases)
           finalSuccesses.sort((a, b) => b.length - a.length)
           console.log(`[court-case] ${url} — final retry got ${finalSuccesses[0].length} cases`)
-          return finalSuccesses[0]
+          return { items: finalSuccesses[0], failed: false }
         }
-        console.log(`[court-case] ${url} — all retries failed, returning []`)
-        return []
+        // v153: Every proxy failed across the initial race AND both retry
+        // tiers (10s + 15s + 20s timeouts, all CF Workers + direct + curl).
+        // This is a genuine fetch FAILURE, not a confirmed "zero cases" — flag
+        // it so stats.ts can warn the user instead of silently under-reporting.
+        console.log(`[court-case] ${url} — all retries failed (health: ${workerHealth.stats(originKey)}), marking as incomplete`)
+        return { items: [] as CourtCase[], failed: true }
       }
 
       // Take the best (most cases)
       retrySuccesses.sort((a, b) => b.length - a.length)
       console.log(`[court-case] ${url} — retry got ${retrySuccesses[0].length} cases (best of ${retrySuccesses.length})`)
-      return retrySuccesses[0]
+      return { items: retrySuccesses[0], failed: false }
     }
 
     // v140: BEST-OF — take the result with the MOST cases, not just the first.
     // This handles the case where one proxy returns 6 cases and another returns 100.
     successes.sort((a, b) => b.length - a.length)
     const best = successes[0]
-    console.log(`[court-case] ${url} — got ${best.length} cases (best of ${successes.length} successful proxies)`)
-    return best
+    console.log(`[court-case] ${url} — got ${best.length} cases (best of ${successes.length} successful proxies, health: ${workerHealth.stats(originKey)})`)
+    return { items: best, failed: false }
   })
 
   const results = await Promise.all(promises)
   // Merge and deduplicate by case number
   const merged: CourtCase[] = []
   const seen = new Set<string>()
-  for (const items of results) {
+  let incomplete = false
+  for (const { items, failed } of results) {
+    if (failed) incomplete = true
     for (const item of items) {
       if (item.caseNumber && !seen.has(item.caseNumber)) {
         seen.add(item.caseNumber)
@@ -379,8 +467,8 @@ async function searchCourtCasesInternal(
     }
   }
 
-  console.log(`[court-case] found ${merged.length} cases`)
-  return merged
+  console.log(`[court-case] found ${merged.length} cases${incomplete ? ' — INCOMPLETE: one or more sources failed after all retries' : ''}`)
+  return { cases: merged, incomplete }
 }
 
 interface ApiConfig {

@@ -93,6 +93,13 @@ export function createWorkerPool() {
 // registers with health-registry.ts so the /api/settings/health endpoint
 // can enumerate all pools.
 
+export interface RequestRecord {
+  ts: number // timestamp
+  ok: boolean
+  ms: number // response time
+  origin: string
+}
+
 export interface WorkerHealthState {
   label: string
   // Consecutive (resets on success) — drives dead/cooldown
@@ -108,12 +115,16 @@ export interface WorkerHealthState {
   lastResponseTimeMs: number | null
   lastUsedAt: number // timestamp of last getRaceCandidates touch OR outcome record
   lastFailureReason: string | null
+
+  // v167: Ring buffer of recent request records for time-series charts
+  history: RequestRecord[]
 }
 
 export class OriginHealthPool {
   private states = new Map<string, WorkerHealthState>()
   private static readonly DEAD_THRESHOLD = 3 // mark dead after 3 consecutive failures
   private static readonly DEAD_COOLDOWN_MS = 45_000 // skip dead workers for 45s
+  private static readonly MAX_HISTORY = 500 // v167: ring buffer size for time-series
 
   constructor(private readonly poolLabel: string) {
     // v158: Auto-register with the health registry
@@ -142,10 +153,20 @@ export class OriginHealthPool {
         lastResponseTimeMs: null,
         lastUsedAt: 0,
         lastFailureReason: null,
+        history: [], // v167: ring buffer for time-series
       }
       this.states.set(k, s)
     }
     return s
+  }
+
+  /** v167: Push a request record to the history ring buffer. */
+  private pushHistory(s: WorkerHealthState, origin: string, ok: boolean, ms: number): void {
+    s.history.push({ ts: Date.now(), ok, ms, origin })
+    // Trim to max size (ring buffer)
+    if (s.history.length > OriginHealthPool.MAX_HISTORY) {
+      s.history.shift()
+    }
   }
 
   /** The workers worth firing in parallel for `originKey` right now. Never
@@ -184,6 +205,7 @@ export class OriginHealthPool {
     s.totalSuccesses++
     s.lastResponseTimeMs = responseMs
     s.lastUsedAt = Date.now()
+    this.pushHistory(s, originKey, true, responseMs) // v167
   }
 
   /** Call on a transport-level failure (timeout, 5xx/521, parse error).
@@ -202,6 +224,7 @@ export class OriginHealthPool {
     s.totalFailures++
     s.lastResponseTimeMs = responseMs
     s.lastUsedAt = Date.now()
+    this.pushHistory(s, originKey, false, responseMs) // v167
     if (s.failures >= OriginHealthPool.DEAD_THRESHOLD && s.deadUntil === 0) {
       s.deadUntil = Date.now() + OriginHealthPool.DEAD_COOLDOWN_MS
       console.log(`[${this.poolLabel}] ${s.label} marked DEAD for ${originKey} for ${OriginHealthPool.DEAD_COOLDOWN_MS / 1000}s (${s.failures} consecutive failures)`)
@@ -239,6 +262,7 @@ export class OriginHealthPool {
         lastFailureReason: s.lastFailureReason,
         deadUntil: s.deadUntil > now ? new Date(s.deadUntil).toISOString() : null,
         status: s.deadUntil > now ? 'dead' : 'alive',
+        history: s.history, // v167: include request history for time-series
       })
     }
 

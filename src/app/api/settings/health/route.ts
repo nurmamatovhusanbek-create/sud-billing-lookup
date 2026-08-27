@@ -40,6 +40,7 @@ export async function GET() {
     deadUntil: string | null
     status: 'alive' | 'dead'
     origins: string[]
+    history: Array<{ ts: number; ok: boolean; ms: number; origin: string }>
   }>()
 
   let totalRequests = 0
@@ -73,6 +74,7 @@ export async function GET() {
           deadUntil: null as string | null,
           status: 'alive' as 'alive' | 'dead',
           origins: [] as string[],
+          history: [] as Array<{ ts: number; ok: boolean; ms: number; origin: string }>,
         }
 
         existing.totalRequests += w.totalRequests
@@ -83,6 +85,10 @@ export async function GET() {
         if (w.lastResponseTimeMs !== null) existing.lastResponseTimeMs = w.lastResponseTimeMs
         if (w.lastUsedAt && (!existing.lastUsedAt || w.lastUsedAt > existing.lastUsedAt)) existing.lastUsedAt = w.lastUsedAt
         if (w.lastFailureAt && (!existing.lastFailureAt || w.lastFailureAt > existing.lastFailureAt)) existing.lastFailureAt = w.lastFailureAt
+        // v167: Merge history arrays
+        if (w.history && Array.isArray(w.history)) {
+          existing.history.push(...w.history)
+        }
         if (w.lastFailureReason) existing.lastFailureReason = w.lastFailureReason
         if (w.deadUntil) existing.deadUntil = w.deadUntil
         if (w.status === 'dead') existing.status = 'dead'

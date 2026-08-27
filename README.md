@@ -20,16 +20,30 @@ A comprehensive legal intelligence platform for Uzbekistan that aggregates court
 
 ### Key Technical Features
 
-- **Cloudflare Workers** (4 workers, round-robin) — All requests to sud.uz / orginfo.uz / chamber.uz route through CF Workers with hardcoded fallback URLs. User IP is never exposed.
-- **curl-based TLS fingerprint bypass** — jadval.sud.uz does TLS fingerprinting (JA3/JA4) and blocks non-browser clients. System `curl` (via `execSync`, running through Git Bash) is used to bypass this, running in parallel with CF Worker + Node.js fetch attempts.
+- **Cloudflare Workers** (4 workers, parallel race) — All requests to sud.uz / orginfo.uz / chamber.uz route through CF Workers with health-tracked parallel racing. User IP is never exposed.
+- **Health-tracked worker pool** — Per-origin × per-worker health tracking with 3-strike dead marking, 45s cooldown, and auto-revival. Dead workers are skipped in the parallel race to avoid wasting timeout budget.
+- **curl-based TLS fingerprint bypass** — jadval.sud.uz does TLS fingerprinting (JA3/JA4) and blocks non-browser clients. On Windows, `C:\Windows\System32\curl.exe` (Schannel TLS) is used explicitly — MSYS2's OpenSSL curl is rejected by jadval.sud.uz.
 - **Parallel Race + BEST-OF** — For each API endpoint, ALL proxies (CF Workers + curl + direct fetch) fire simultaneously. The result with the MOST cases wins.
-- **Server-side caching** — 60-second in-memory cache for court-case search results and stats. Deduplicates concurrent calls from Stats + Watchlist tabs.
-- **Client-side caching** — 5-minute localStorage cache for company info, stats, and case lists. 24-hour server-side cache for orginfo TIN lookups. Force-refresh via "Yangilash" button.
-- **Excel export** — Both bills and stats can be exported to .xlsx (built manually with jszip — no Excel library dependency, no Turbopack issues).
-- **PDF export** — Court case details can be printed to high-res PDF via browser print engine (vector text, no rasterization).
+- **3-tier retry** — 10s → 15s → 20s timeouts, each tier fires all workers in parallel. curl is retried in all 3 tiers for jadval.sud.uz.
+- **Server-side caching** — 60-second in-memory cache for court-case search results. Force-refresh via `?force=1` clears both client and server cache for fresh scrape.
+- **Client-side caching** — 5-minute localStorage cache for company info, stats, and case lists. Force-refresh via "Yangilash" button.
+- **Settings dialog** (gear icon in header) — 3-tab dialog:
+  - **Yangilanishlar (Updates)**: Checks GitHub for latest commit, compares with local SHA. "Yangilash" button auto-stashes local changes, runs `git pull origin main`, pops stash. No need to close the dev server.
+  - **Workerlar (Workers)**: Add/remove/test CF Worker URLs. Workers persist to `workers.json` (hot-reloaded, no restart). "Kodni nusxalash" button copies the CF Worker source code to clipboard. Test endpoint validates a worker by fetching a known jadvalapi endpoint and checking the response shape.
+  - **Holat (Health)**: Cloudflare-style analytics dashboard with:
+    - Time span picker (Bugun / 7 kun / 30 kun / Barcha)
+    - Donut chart for overall success rate
+    - Sparkline charts (SVG) showing request volume over time per worker
+    - Expandable worker cards with recent request timeline, failure reasons, origins
+    - ESC key to collapse expanded card
+    - Auto-refresh toggle (default OFF, 5s interval)
+- **Request history tracking** — 500-entry ring buffer per worker records every request with timestamp, success/fail, response time, and origin. Powers the sparkline charts and recent requests timeline.
+- **Excel export** — Both bills and stats can be exported to .xlsx (built manually with jszip).
+- **PDF export** — Court case details can be printed to high-res PDF via browser print engine.
 - **Dark/Light theme** — Pure grayscale palette (white→black ramp), persists to localStorage, FOUC-prevented.
-- **Design system** — Radius tokens (--r-pill/--r-card/--r-field/--r-tag/--r-dot), spacing scale (--space-1..8), icon scale (--icon-sm/md/lg), motion token (--ease-surface). Each component declares its own radius in its own CSS block.
-- **Shared primitives** — DataStrip (replaces box-in-box pattern), CaseRefRow (reusable "related case" row with dot+text status), ReceiptView (styled cheque), unified Button component, SegmentedControl (tabs/folders).
+- **Design system** — Radius tokens, spacing scale, icon scale, motion token. Each component declares its own radius.
+- **Shared primitives** — DataStrip, CaseRefRow, ReceiptView, unified Button, SegmentedControl.
+- **Watchlist optimization** — Fetches only fire when the user opens the Kuzatuv tab (not on page load). Staggered 2s between companies to avoid flooding jadval.sud.uz.
 
 ### Data Sources
 

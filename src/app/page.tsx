@@ -2815,22 +2815,37 @@ function WatchlistTab({
     )
   }, [])
 
-  // On mount: load entries from localStorage AND kick off fetches for every
-  // saved entry. v157: STAGGER the fetches (2s between each company) instead
-  // of firing all at once — firing 3 companies × 3 API calls = 9 simultaneous
-  // requests was flooding jadval.sud.uz and causing 502 Bad Gateway responses.
+  // v159: On mount, load entries from localStorage but DO NOT auto-fetch.
+  // The watchlist fetches (stats/rating/hearings per company) are expensive —
+  // 3 companies × 3 API calls = 9 requests hitting jadval.sud.uz, which causes
+  // 502 Bad Gateway when fired simultaneously on page load.
+  // Instead, fetches only happen when:
+  //   1. The user opens the Watchlist tab (see the tab-change effect below)
+  //   2. The user manually clicks "Yangilash" on a specific company
+  //   3. The user adds a new company (handleAdd)
+  const [watchlistFetched, setWatchlistFetched] = useState(false)
   useEffect(() => {
     const list = loadWatchlist()
-    // Use queueMicrotask to avoid synchronous setState in effect (lint rule)
     queueMicrotask(() => {
       setEntries(list)
-      // v157: Stagger fetches — 2s delay between each company so we don't
-      // hammer jadval.sud.uz with all companies at once on page load.
-      list.forEach((e, i) => {
-        setTimeout(() => kickOffFetch(e.tin), i * 2000)
-      })
     })
   }, [])
+
+  // v159: Only fetch watchlist data when the user opens the Watchlist tab.
+  // This prevents 9 simultaneous API calls on page load when the user is on
+  // the Bills tab and hasn't even looked at the Watchlist yet.
+  useEffect(() => {
+    if (tab === 'watchlist' && !watchlistFetched && entries.length > 0) {
+      // Use queueMicrotask to avoid synchronous setState in effect (lint rule)
+      queueMicrotask(() => {
+        setWatchlistFetched(true)
+        // Stagger fetches — 2s delay between each company
+        entries.forEach((e, i) => {
+          setTimeout(() => kickOffFetch(e.tin), i * 2000)
+        })
+      })
+    }
+  }, [tab, watchlistFetched, entries, kickOffFetch])
 
   const handleAdd = () => {
     const tin = addTin.replace(/\D/g, '').slice(0, 9)

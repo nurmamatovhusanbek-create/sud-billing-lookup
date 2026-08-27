@@ -5,4 +5,4 @@
  * The git SHA functions are in version-server.ts (server-only).
  */
 
-export const APP_VERSION = 'v160'
+export const APP_VERSION = 'v161'

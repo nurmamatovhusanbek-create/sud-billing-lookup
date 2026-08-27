@@ -801,7 +801,17 @@ export async function getCaptchaToken(
           3,
         )
         if (result.success && result.token) return result.token
-      } catch {
+      } catch (e) {
+        // v161: Vision API (internal-api.z.ai) may not be accessible from all
+        // networks. Log the error clearly but don't crash — the billing search
+        // can still succeed if the captcha score was high enough (no challenge
+        // needed). The error falls through to the next attempt.
+        const msg = e instanceof Error ? e.message : String(e)
+        if (msg.includes('ConnectionRefused') || msg.includes('Unable to connect')) {
+          console.error('[captcha] Vision API isqib bo\'lmadi (internal-api.z.ai). Matematika captchasini yechish o\'tkazib yuborildi.')
+        } else {
+          console.error(`[captcha] math challenge error: ${msg.slice(0, 150)}`)
+        }
         // fall through to next attempt
       }
     }

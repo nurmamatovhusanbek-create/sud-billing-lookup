@@ -2446,3 +2446,28 @@ Work Log:
 
 Stage Summary:
 - v158 adds a full Settings dialog with 3 tabs: Updates (GitHub commit checker + git pull), Workers (add/remove/test CF Worker URLs with file-based persistence), Health (dashboard showing per-worker request counts, success rates, response times, dead/alive status). Workers are stored in workers.json (hot-reloaded, no restart needed). Health tracking extended from consecutive-failure-only to full totals + timing + failure reasons. All monochrome UI matching existing design system.
+
+---
+Task ID: chamber-fix
+Agent: sub-agent (general-purpose)
+Task: Fix chamber.ts to fire ALL CF Workers in PARALLEL (Promise.allSettled race) instead of round-robin picking one, so the Company tab no longer shows no rating when chamber.uz times out.
+
+Work Log:
+- Root cause: `getCompanyRating()` was calling `getCfWorkerUrl(url)` (single round-robin worker from `createWorkerPool().nextProxyUrl()`). If that one worker was slow or dead, the 10s `AbortSignal.timeout` fired and the function returned null — so the Company tab showed no rating. court-case.ts already solved this by racing ALL workers in parallel; chamber.ts was just never upgraded.
+- Read `/home/z/my-project/src/lib/chamber.ts`, `/home/z/my-project/src/lib/cf-worker-pool.ts`, and `/home/z/my-project/src/lib/court-case.ts` to confirm the existing `getCfWorkerUrls()` export and the parallel-race pattern court-case.ts uses.
+- Rewrite applied to `src/lib/chamber.ts`:
+  - Replaced the `createWorkerPool` import + `_workerPool` instance + `getCfWorkerUrl(url)` helper with a direct `import { getCfWorkerUrls } from './cf-worker-pool'`. The round-robin counter and `nextProxyUrl` are no longer used here.
+  - `getCompanyRating()` now:
+    1. Builds `targetUrl` = `https://admin.chamber.uz/api/GetCompanyCriteries/{TIN}`.
+    2. Pulls `workers = getCfWorkerUrls()` (all configured workers — from workers.json, env, or FALLBACK_WORKERS).
+    3. Fires `Promise.allSettled(workers.map(async workerUrl => fetch(workerUrl + targetUrl, { signal: AbortSignal.timeout(10_000), headers: { Accept: 'application/json' } })))` — ALL workers in parallel, 10s timeout per request (unchanged).
+    4. Each promise resolves with `{ workerUrl, data }` only when `res.ok` AND `data.tin` is present (same "is this real company data" check as before). Anything else rejects with `HTTP {status}` / `no data` / the underlying fetch error.
+    5. Iterates `results` and returns the FIRST fulfilled result's data — the data-mapping block (tin, name, criteriaAll, type, okedDetail.*, etc.) is byte-for-byte identical to the previous implementation, so the return shape is unchanged.
+    6. On success logs `[chamber] TIN {tin} — worker {hostname} succeeded` (hostname extracted via `new URL(workerUrl).hostname`, falls back to raw URL on parse failure).
+    7. If every worker failed, logs `[chamber] all {N} workers failed for TIN {tin}: {reason1}, {reason2}, ...` and returns null — same return type as before (`ChamberRating | null`).
+- Function signature and return type are unchanged: `export async function getCompanyRating(tin: string): Promise<ChamberRating | null>`.
+- Did NOT add OriginHealthPool / health tracking — that is explicitly a separate concern (already wired into court-case.ts via v158's `recordOutcome`/`recordSuccess`/`recordFailure`).
+- Lint: `cd /home/z/my-project && bun run lint` → exit code 0, no errors, no warnings.
+
+Stage Summary:
+- chamber.ts now mirrors the resilience pattern court-case.ts already uses: fire every CF Worker simultaneously and take the first successful response, instead of betting the entire Company-tab rating on a single round-robin worker. As long as ANY worker reaches admin.chamber.uz within 10s, the rating will render. The slow/dead-worker timeout that was blanking the Company tab is eliminated. No API surface, return type, or downstream consumer changed — pure internal robustness upgrade.

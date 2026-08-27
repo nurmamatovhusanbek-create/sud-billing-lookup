@@ -39,12 +39,12 @@ export interface ChamberRating {
 
 // ---- CF Worker proxy helper ----------------------------------------------
 
-// v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic
-import { createWorkerPool } from './cf-worker-pool'
-const _workerPool = createWorkerPool()
-function getCfWorkerUrl(url: string): string {
-  return _workerPool.nextProxyUrl(url)
-}
+// v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic.
+// chamber-fix: Import getCfWorkerUrls to fire ALL workers in PARALLEL
+// (Promise.allSettled race) instead of round-robin picking just one.
+// A single slow/dead worker can no longer cause the Company tab to show
+// no rating — as long as ANY worker reaches chamber.uz within 10s, we win.
+import { getCfWorkerUrls } from './cf-worker-pool'
 
 // ---- API -----------------------------------------------------------------
 
@@ -53,57 +53,81 @@ function getCfWorkerUrl(url: string): string {
  *
  * GET https://admin.chamber.uz/api/GetCompanyCriteries/{STIR}
  * Returns rating score, category, taxpayer type, region, industry info.
+ *
+ * chamber-fix: Fires ALL CF Workers in PARALLEL (Promise.allSettled) and
+ * takes the first successful response. Mirrors the resilient strategy
+ * already used in court-case.ts: if one worker is slow/dead, the others
+ * still deliver. 10s timeout per request, same ChamberRating | null return.
  */
 export async function getCompanyRating(tin: string): Promise<ChamberRating | null> {
   const cleanTin = tin.trim()
   if (!/^\d{9}$/.test(cleanTin)) return null
 
-  const url = `https://admin.chamber.uz/api/GetCompanyCriteries/${cleanTin}`
-  const proxiedUrl = getCfWorkerUrl(url)
+  const targetUrl = `https://admin.chamber.uz/api/GetCompanyCriteries/${cleanTin}`
+  const workers = getCfWorkerUrls()
 
-  try {
-    console.log(`[chamber] fetching rating for TIN ${cleanTin}`)
-    const res = await fetch(proxiedUrl, {
-      signal: AbortSignal.timeout(10_000),
-      headers: { Accept: 'application/json' },
-    })
-    if (!res.ok) {
-      console.log(`[chamber] HTTP ${res.status} for TIN ${cleanTin}`)
-      return null
-    }
-    const data = await res.json()
+  console.log(`[chamber] fetching rating for TIN ${cleanTin} via ${workers.length} workers in parallel`)
 
-    // Check if we got actual company data (not an error/empty response)
-    if (!data || !data.tin) {
-      console.log(`[chamber] no data for TIN ${cleanTin}`)
-      return null
-    }
+  // Fire ALL workers simultaneously. 10s timeout per request. Each promise
+  // resolves with { workerUrl, data } on success or rejects on any failure
+  // (timeout, HTTP error, parse error, no data.tin). The first fulfilled
+  // result with valid data wins; the rest are ignored.
+  const results = await Promise.allSettled(
+    workers.map(async (workerUrl) => {
+      const proxiedUrl = workerUrl + targetUrl
+      const res = await fetch(proxiedUrl, {
+        signal: AbortSignal.timeout(10_000),
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      // Check if we got actual company data (not an error/empty response)
+      if (!data || !data.tin) {
+        throw new Error('no data')
+      }
+      return { workerUrl, data }
+    }),
+  )
 
-    return {
-      tin: data.tin,
-      name: data.name || data.nameUz || '',
-      nameRu: data.nameRu || '',
-      nameLat: data.nameLat || data.nameUz || '',
-      criteriaAll: data.criteriaAll ?? 0,
-      type: data.type || '—',
-      taxpayerType: data.taxpayerType ?? 0,
-      taxpayername: data.taxpayername || data.taxpayer_name_uz_latn || '',
-      regionNameUz: data.regionNameUz || '',
-      regionNameLat: data.regionNameLat || '',
-      districtNameUz: data.districtNameUz || '',
-      districtNameLat: data.districtNameLat || '',
-      okedCode: data.okedDetail?.code || '',
-      okedName: data.okedDetail?.name_uz_latn || data.okedDetail?.name || '',
-      okedNameRu: data.okedDetail?.name_ru || '',
-      okedSection: data.okedDetail?.section || '',
-      okedShortName: data.okedDetail?.name_short_ru || '',
-      employeeLimitMf: data.okedDetail?.employee_limit_mf ?? 0,
-      employeeLimitLf: data.okedDetail?.employee_limit_lf ?? 0,
+  // Take the FIRST successful response with valid data.
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      const { workerUrl, data } = r.value
+      let workerLabel = workerUrl
+      try { workerLabel = new URL(workerUrl).hostname } catch { /* keep raw URL */ }
+      console.log(`[chamber] TIN ${cleanTin} — worker ${workerLabel} succeeded`)
+      return {
+        tin: data.tin,
+        name: data.name || data.nameUz || '',
+        nameRu: data.nameRu || '',
+        nameLat: data.nameLat || data.nameUz || '',
+        criteriaAll: data.criteriaAll ?? 0,
+        type: data.type || '—',
+        taxpayerType: data.taxpayerType ?? 0,
+        taxpayername: data.taxpayername || data.taxpayer_name_uz_latn || '',
+        regionNameUz: data.regionNameUz || '',
+        regionNameLat: data.regionNameLat || '',
+        districtNameUz: data.districtNameUz || '',
+        districtNameLat: data.districtNameLat || '',
+        okedCode: data.okedDetail?.code || '',
+        okedName: data.okedDetail?.name_uz_latn || data.okedDetail?.name || '',
+        okedNameRu: data.okedDetail?.name_ru || '',
+        okedSection: data.okedDetail?.section || '',
+        okedShortName: data.okedDetail?.name_short_ru || '',
+        employeeLimitMf: data.okedDetail?.employee_limit_mf ?? 0,
+        employeeLimitLf: data.okedDetail?.employee_limit_lf ?? 0,
+      }
     }
-  } catch (e) {
-    console.log(`[chamber] error for TIN ${cleanTin}: ${e instanceof Error ? e.message : 'unknown'}`)
-    return null
   }
+
+  // All workers failed (timeout, HTTP error, or no data).
+  const reasons = results
+    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    .map(r => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+  console.log(`[chamber] all ${workers.length} workers failed for TIN ${cleanTin}: ${reasons.join(', ')}`)
+  return null
 }
 
 /**

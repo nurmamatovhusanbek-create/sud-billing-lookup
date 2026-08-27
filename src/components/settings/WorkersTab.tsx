@@ -34,8 +34,9 @@ const REASON_LABELS: Record<string, string> = {
   timeout: 'Vaqt tugadi',
   http_502: '502 Bad Gateway',
   http_5xx: 'Server xatosi (5xx)',
-  http_4xx: "Xato so'rov (4xx)",
+  http_4xx: 'Xato so\'rov (4xx)',
   non_json: 'JSON emas',
+  html_response: 'HTML sahifa (worker ishlamaydi)',
   wrong_shape: "Noto'g'ri format",
   network_error: 'Tarmoq xatosi',
   not_https: 'HTTPS emas',
@@ -211,7 +212,7 @@ export function WorkersTab() {
 
           {/* Test result */}
           {testResult && (
-            <div className="flex items-start gap-2 p-3 rounded-md bg-muted text-sm">
+            <div className="flex items-start gap-2 p-3 rounded-md bg-muted text-sm relative">
               {testResult.ok ? (
                 <Check className="w-4 h-4 shrink-0 mt-0.5" />
               ) : (
@@ -240,6 +241,13 @@ export function WorkersTab() {
                   </div>
                 )}
               </div>
+              <button
+                onClick={() => setTestResult(null)}
+                className="shrink-0 p-1 hover:bg-background rounded transition-colors"
+                aria-label="Yopish"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
 

@@ -2774,8 +2774,10 @@ async function fetchWatchNextHearing(tin: string): Promise<string | null> {
 }
 
 function WatchlistTab({
+  isActive,
   onViewInStats,
 }: {
+  isActive: boolean
   onViewInStats: (tin: string) => void
 }) {
   const [entries, setEntries] = useState<WatchlistEntry[]>([])
@@ -2835,7 +2837,7 @@ function WatchlistTab({
   // This prevents 9 simultaneous API calls on page load when the user is on
   // the Bills tab and hasn't even looked at the Watchlist yet.
   useEffect(() => {
-    if (tab === 'watchlist' && !watchlistFetched && entries.length > 0) {
+    if (isActive && !watchlistFetched && entries.length > 0) {
       // Use queueMicrotask to avoid synchronous setState in effect (lint rule)
       queueMicrotask(() => {
         setWatchlistFetched(true)
@@ -2845,7 +2847,7 @@ function WatchlistTab({
         })
       })
     }
-  }, [tab, watchlistFetched, entries, kickOffFetch])
+  }, [isActive, watchlistFetched, entries, kickOffFetch])
 
   const handleAdd = () => {
     const tin = addTin.replace(/\D/g, '').slice(0, 9)
@@ -5609,7 +5611,7 @@ export default function Home() {
             data-panel="watchlist"
             role="tabpanel"
           >
-            <WatchlistTab onViewInStats={(tin) => { setPendingStatsTin(tin); setTab('stats') }} />
+            <WatchlistTab isActive={tab === 'watchlist'} onViewInStats={(tin) => { setPendingStatsTin(tin); setTab('stats') }} />
           </section>
         </main>
 

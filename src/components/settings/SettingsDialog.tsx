@@ -25,7 +25,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-none w-screen h-screen sm:rounded-none p-0 gap-0 flex flex-col">
+      <DialogContent
+        className="p-0 gap-0 flex flex-col"
+        style={{ maxWidth: 'none', width: '100vw', height: '100vh', borderRadius: 0, borderWidth: 0 }}
+      >
         <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
           <div className="flex items-center justify-between">
             <div>

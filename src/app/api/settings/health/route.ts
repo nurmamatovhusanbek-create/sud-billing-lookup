@@ -18,7 +18,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getAllHealthPools } from '@/lib/registry'
+import { getAllHealthPools } from '@/lib/health-registry'
 import { getCfWorkerUrls } from '@/lib/cf-worker-pool'
 
 // v161: All known sud.uz API sources that the app talks to (not just active ones)

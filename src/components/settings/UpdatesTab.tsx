@@ -24,7 +24,8 @@ export function UpdatesTab() {
   const fetchVersion = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/settings/version')
+      // v166: force=1 bypasses server-side cache so we always get fresh data
+      const res = await fetch(`/api/settings/version?force=1&_=${Date.now()}`)
       const data = await res.json()
       setInfo(data)
     } catch (e) {

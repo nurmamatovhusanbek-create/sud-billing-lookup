@@ -26,6 +26,7 @@ export const maxDuration = 90
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const tin = (searchParams.get('tin') || '').trim()
+  const force = searchParams.get('force') === '1' // v166: force fresh scrape
 
   // Validate TIN (9 digits)
   if (!tin || !/^\d{9}$/.test(tin)) {
@@ -33,6 +34,12 @@ export async function GET(req: NextRequest) {
       { ok: false, error: "STIR aynan 9 ta raqamdan iborat bo'lishi kerak" },
       { status: 400 },
     )
+  }
+
+  // v166: force=1 clears server-side court-case cache for this TIN
+  if (force) {
+    const { clearCourtCaseCache } = await import('@/lib/court-case')
+    clearCourtCaseCache(tin)
   }
 
   // 60s overall timeout — gives the v140 parallel-race retry logic (10s first

@@ -29,10 +29,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         className="p-0 gap-0 flex flex-col"
         style={{ maxWidth: '95vw', width: '95vw', height: '92vh', maxHeight: '92vh' }}
       >
-        <DialogHeader className="px-6 pt-6 pb-3 shrink-0 pr-12">
+        <DialogHeader className="px-8 pt-8 pb-4 shrink-0 pr-14">
           <div className="flex items-center justify-between">
             <div>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 text-lg">
                 <SettingsIcon className="w-5 h-5" />
                 Sozlamalar
               </DialogTitle>
@@ -57,15 +57,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           onValueChange={(v) => setActiveTab(v as any)}
           className="w-full flex-1 flex flex-col min-h-0"
         >
-          <div className="px-6 pb-2 shrink-0">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="updates">Yangilanishlar</TabsTrigger>
-              <TabsTrigger value="workers">Workerlar</TabsTrigger>
-              <TabsTrigger value="health">Holat</TabsTrigger>
+          <div className="px-8 pb-3 shrink-0">
+            <TabsList className="grid w-full grid-cols-3 h-10">
+              <TabsTrigger value="updates" className="text-sm">Yangilanishlar</TabsTrigger>
+              <TabsTrigger value="workers" className="text-sm">Workerlar</TabsTrigger>
+              <TabsTrigger value="health" className="text-sm">Holat</TabsTrigger>
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 pb-6">
+          <div className="flex-1 overflow-y-auto px-8 pb-8">
             <TabsContent value="updates" className="mt-0">
               <UpdatesTab key={`updates-${refreshKey}`} />
             </TabsContent>

@@ -265,6 +265,25 @@ function getCourtCasesCached(
 }
 
 /**
+ * v166: Clear server-side court-case cache for a specific TIN.
+ * Used by /api/stats?force=1 to force a fresh scrape.
+ */
+export function clearCourtCaseCache(tin: string): void {
+  const keysToDelete: string[] = []
+  for (const key of courtCaseCache.keys()) {
+    if (key.includes(tin)) {
+      keysToDelete.push(key)
+    }
+  }
+  for (const key of keysToDelete) {
+    courtCaseCache.delete(key)
+  }
+  if (keysToDelete.length > 0) {
+    console.log(`[court-case] cleared ${keysToDelete.length} cache entries for TIN ${tin}`)
+  }
+}
+
+/**
  * Search court cases. Calls both jadval.sud.uz and jadvalapi.sud.uz and merges
  * the results (the Angular frontend does the same).
  *

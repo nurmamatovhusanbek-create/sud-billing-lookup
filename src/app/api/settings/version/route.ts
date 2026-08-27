@@ -34,9 +34,9 @@ interface CachedRemote {
 let _cachedRemote: CachedRemote | null = null
 let _cachedAt = 0
 
-async function fetchLatestCommit(): Promise<{ data: CachedRemote | null; rateLimited: boolean; retryAfterSec?: number }> {
+async function fetchLatestCommit(force = false): Promise<{ data: CachedRemote | null; rateLimited: boolean; retryAfterSec?: number }> {
   const now = Date.now()
-  if (_cachedRemote && now - _cachedAt < CACHE_TTL_MS) {
+  if (!force && _cachedRemote && now - _cachedAt < CACHE_TTL_MS) {
     return { data: _cachedRemote, rateLimited: false }
   }
 
@@ -80,13 +80,17 @@ async function fetchLatestCommit(): Promise<{ data: CachedRemote | null; rateLim
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // v166: Support ?force=1 to bypass server-side cache
+  const { searchParams } = new URL(request.url)
+  const force = searchParams.get('force') === '1'
+
   const localSha = getLocalGitSha()
   const branch = getLocalGitBranch()
   const clean = isWorkingTreeClean()
   const gitAvailable = localSha !== null
 
-  const { data: remote, rateLimited, retryAfterSec } = await fetchLatestCommit()
+  const { data: remote, rateLimited, retryAfterSec } = await fetchLatestCommit(force)
 
   const updateAvailable = !!(localSha && remote?.sha && localSha !== remote.sha)
 

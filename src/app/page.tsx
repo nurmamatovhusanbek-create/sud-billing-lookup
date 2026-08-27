@@ -3474,7 +3474,11 @@ function StatsTab({
     try {
       // Phase 1 → 2 after a short tick (so the user sees the "company" step)
       setTimeout(() => setPhase(2), 600)
-      const res = await fetch(`/api/stats?tin=${encodeURIComponent(tin)}`, {
+      // v166: force=1 clears server-side court-case cache for fresh scrape
+      const statsUrl = force
+        ? `/api/stats?tin=${encodeURIComponent(tin)}&force=1`
+        : `/api/stats?tin=${encodeURIComponent(tin)}`
+      const res = await fetch(statsUrl, {
         signal: AbortSignal.timeout(70000),
       })
       const json = (await res.json()) as StatsResponseOk | StatsResponseErr

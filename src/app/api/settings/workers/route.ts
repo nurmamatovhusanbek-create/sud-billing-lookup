@@ -18,28 +18,33 @@ import {
 import { getCfWorkerUrls } from '@/lib/cf-worker-pool'
 import { pruneAllPools } from '@/lib/health-registry'
 
-// GET — list all workers
+// GET — list all workers (merge workers.json + fallback/env)
 export async function GET() {
   const source = getWorkerSource()
   const entries = getWorkerEntries()
 
-  // If no workers.json, show the env/fallback workers with empty metadata
-  if (entries.length === 0) {
-    const urls = getCfWorkerUrls()
-    return NextResponse.json({
-      source,
-      workers: urls.map(url => ({
+  // v165: Always merge workers.json entries with fallback/env workers.
+  // This way, even if workers.json has only 1 custom worker, the pre-set
+  // fallback workers still show up in the UI.
+  const fallbackUrls = getCfWorkerUrls()
+  const entryUrls = new Set(entries.map(e => e.url))
+  
+  // Add fallback workers that aren't already in workers.json
+  const mergedWorkers = [
+    ...entries,
+    ...fallbackUrls
+      .filter(url => !entryUrls.has(url))
+      .map(url => ({
         url,
-        addedAt: null,
-        lastTestedAt: null,
-        lastTestResult: null,
+        addedAt: null as string | null,
+        lastTestedAt: null as string | null,
+        lastTestResult: null as 'ok' | 'fail' | null,
       })),
-    })
-  }
+  ]
 
   return NextResponse.json({
     source,
-    workers: entries,
+    workers: mergedWorkers,
   })
 }
 

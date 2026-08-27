@@ -179,7 +179,7 @@ export function UpdatesTab() {
             </p>
             <Button
               onClick={handleUpdate}
-              disabled={updating || info.local.dirty}
+              disabled={updating}
               className="w-full gap-2"
             >
               {updating ? (
@@ -196,7 +196,7 @@ export function UpdatesTab() {
             </Button>
             {info.local.dirty && (
               <p className="text-xs text-muted-foreground mt-2 text-center">
-                O'zgarishlarni commit qiling yoki stash qiling
+                Ogohlantirish: lokal o'zgarishlar bor — yangilash paytida stash qilinadi
               </p>
             )}
           </CardContent>

@@ -38,25 +38,18 @@ export async function POST() {
     )
   }
 
-  // Check working tree is clean
+  // v165: If working tree is dirty, stash changes before pulling.
+  // This makes the Yangilash button always work, even with uncommitted changes.
   const clean = isWorkingTreeClean()
+  let stashed = false
   if (clean === false) {
     try {
-      const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { timeout: 5000 })
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'dirty_tree',
-          detail: 'Working tree has uncommitted changes. Commit or stash them first.',
-          changes: stdout.trim().split('\n').slice(0, 20),
-        },
-        { status: 409 },
-      )
+      await execFileAsync('git', ['stash', 'push', '-m', 'auto-stash before update'], { timeout: 10000 })
+      stashed = true
+      console.log('[update] Auto-stashed local changes before git pull')
     } catch {
-      return NextResponse.json(
-        { ok: false, error: 'dirty_tree', detail: 'Working tree has uncommitted changes' },
-        { status: 409 },
-      )
+      // Stash failed — try pull anyway, it might work if changes don't conflict
+      console.log('[update] Stash failed, trying pull anyway')
     }
   }
 
@@ -67,6 +60,16 @@ export async function POST() {
       maxBuffer: 1024 * 1024,
     })
 
+    // v165: Pop stash if we stashed earlier
+    if (stashed) {
+      try {
+        await execFileAsync('git', ['stash', 'pop'], { timeout: 10000 })
+        console.log('[update] Auto-popped stash after git pull')
+      } catch {
+        console.log('[update] Stash pop failed — changes remain in stash')
+      }
+    }
+
     const newSha = getLocalGitSha()
     const output = (stdout + (stderr ? '\n' + stderr : '')).trim()
 
@@ -76,6 +79,7 @@ export async function POST() {
       needsRestart: true,
       newSha,
       oldSha: currentSha,
+      stashed,
     })
   } catch (e: any) {
     return NextResponse.json(

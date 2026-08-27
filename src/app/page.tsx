@@ -12,6 +12,7 @@ import {
   Phone, Mail, MapPin, Zap, Layers, Factory, User,
   BarChart3, Megaphone, Shield, Tags, ArrowRight,
   Inbox, Trophy, XCircle, MinusCircle, Grid3x3, Building, Download,
+  Settings,
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -31,6 +32,8 @@ import { ReceiptView } from '@/components/ui-custom/receipt-view'
 import { formatSum, formatTin, formatDate, parseCaseDate, instanceLabel, ratingLabel } from '@/components/shared/formatters'
 import { loadRecent, saveRecent, upsertRecent, removeRecent, loadSavedCompanies, saveCompany, removeSavedCompanyFn, loadWatchlist, saveWatchlistEntry, removeWatchlistEntry } from '@/lib/local-lists'
 import { Button } from '@/components/ui-custom/button'
+import { SettingsDialog } from '@/components/settings/SettingsDialog'
+import { APP_VERSION } from '@/lib/version'
 
 // ---- SVG spinner (monochrome — uses var(--accent)) -------------------
 
@@ -4754,6 +4757,7 @@ export default function Home() {
   const [searched, setSearched] = useState(false)
   const [torStatus, setTorStatus] = useState<'checking' | 'active' | 'inactive'>('checking')
   const [torInstalling, setTorInstalling] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [phase, setPhase] = useState<{ phase: string; detail?: string } | null>(null)
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest')
   const [filters, setFilters] = useState<Set<FilterKey>>(new Set())
@@ -5099,10 +5103,18 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v157</p>
+                <p className="brand-sub">{APP_VERSION}</p>
               </div>
             </div>
             <div className="header-right">
+              <button
+                className="settings-trigger"
+                onClick={() => setSettingsOpen(true)}
+                aria-label="Sozlamalar"
+                title="Sozlamalar"
+              >
+                <Settings className="w-[18px] h-[18px]" />
+              </button>
               <TorStatusBadge
                 status={torStatus}
                 onInstall={() => fileInputRef.current?.click()}
@@ -5587,12 +5599,15 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v157">
+        <footer className="app-footer" data-version={APP_VERSION}>
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v157</div>
+            <div className="footer-text">Sud Billing Lookup {APP_VERSION}</div>
           </div>
         </footer>
       </div>
+
+      {/* ====================== SETTINGS DIALOG ====================== */}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   )
 }

@@ -2418,3 +2418,31 @@ Work Log:
 
 Stage Summary:
 - v156 fixes the v154/v155 curlFetch regression by reverting to `spawn('curl', args)` (the proven v150/v152 approach). The root cause was switching from spawn (finds System32 curl / Schannel TLS on Windows) to execSync (finds MSYS2 curl / OpenSSL TLS via bash, which jadval.sud.uz rejects with 502). Also adds curl retries in all 3 tiers (was only tier 1 before) and diagnostic logging that shows the actual response body when JSON.parse fails. The 502 Bad Gateway from jadval.sud.uz is a WAF response to non-browser TLS fingerprints — Schannel (Windows System32 curl) is accepted, OpenSSL (MSYS2/Linux curl) is rejected. This fix will work on the user's Windows machine but cannot be fully verified on this Linux sandbox (which uses OpenSSL curl and gets 502).
+
+---
+Task ID: v158
+Agent: main
+Task: Add Settings dialog with update checker, worker manager, and health dashboard.
+
+Work Log:
+- Created 3 new lib modules: version.ts (client-safe APP_VERSION), version-server.ts (git utilities), workers-config.ts (workers.json persistence), health-registry.ts (process-wide pool registry).
+- Extended OriginHealthPool in cf-worker-pool.ts with: totalRequests, totalSuccesses, totalFailures, lastResponseTimeMs, lastUsedAt, lastFailureReason. Added recordSuccess/recordFailure methods (replaces markSuccess/markFailed). Added snapshot() method for dashboard. Added pruneWorkers() for cleanup. Auto-registers with health-registry on construction.
+- Updated court-case.ts: recordOutcome now passes response timing to recordSuccess/recordFailure. All 3 retry tiers track response time.
+- Created 5 API routes under /api/settings/:
+  - version/route.ts - checks GitHub API for latest commit, 5-min cache
+  - update/route.ts - runs git pull origin main (async execFile, non-blocking)
+  - workers/route.ts - GET/POST/DELETE for CF Worker URL CRUD
+  - workers/test/route.ts - tests a worker URL against jadvalapi endpoint
+  - health/route.ts - aggregated health stats from all pools
+- Created 4 UI components: SettingsDialog.tsx (shell with 3 tabs), UpdatesTab.tsx, WorkersTab.tsx, HealthTab.tsx.
+- Wired gear button into page.tsx header (settings-trigger class with hover rotate animation).
+- Added .settings-trigger CSS to globals.css.
+- Added workers.json to .gitignore.
+- Installed @radix-ui/react-dialog, @radix-ui/react-tabs, @radix-ui/react-scroll-area.
+- Version bumped v157 -> v158 (version.ts is now single source of truth).
+- Cache version bumped sb-cache-v157 -> sb-cache-v158.
+- Lint: 0 errors.
+- VERIFIED: Page loads HTTP 200. All 5 API endpoints return 200. Worker test endpoint correctly returns {ok:true, caseCount:6}. Worker CRUD works (add/delete from workers.json). Settings button present in HTML.
+
+Stage Summary:
+- v158 adds a full Settings dialog with 3 tabs: Updates (GitHub commit checker + git pull), Workers (add/remove/test CF Worker URLs with file-based persistence), Health (dashboard showing per-worker request counts, success rates, response times, dead/alive status). Workers are stored in workers.json (hot-reloaded, no restart needed). Health tracking extended from consecutive-failure-only to full totals + timing + failure reasons. All monochrome UI matching existing design system.

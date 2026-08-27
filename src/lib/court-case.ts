@@ -358,12 +358,14 @@ async function searchCourtCasesInternal(
     // Record a worker's outcome. A confirmed "not found" counts as a SUCCESS —
     // it proves the worker reached the origin fine, it just found no data.
     // Only transport-level failures count against a worker's health.
-    function recordOutcome(worker: string | null, ok: boolean, msg?: string) {
+    // v158: Now tracks response time and failure reason for the dashboard.
+    function recordOutcome(worker: string | null, ok: boolean, msg?: string, responseMs?: number) {
       if (!worker) return
       if (ok || msg?.startsWith('DEFINITIVE_NOT_FOUND')) {
-        workerHealth.markSuccess(originKey, worker)
+        workerHealth.recordSuccess(originKey, worker, responseMs || 0)
       } else {
-        workerHealth.markFailed(originKey, worker)
+        const reason = msg || 'unknown'
+        workerHealth.recordFailure(originKey, worker, responseMs || 0, reason.slice(0, 100))
       }
     }
 
@@ -371,6 +373,7 @@ async function searchCourtCasesInternal(
     // Fire ALL proxies simultaneously. Take the first valid response.
     // 10s timeout per request.
     const fetchPromises = proxyUrls.map(async ({ url: proxyUrl, label, worker }) => {
+      const startTime = Date.now()
       try {
         const res = await fetch(proxyUrl, {
           headers: {
@@ -381,6 +384,7 @@ async function searchCourtCasesInternal(
           },
           signal: AbortSignal.timeout(10000),
         })
+        const responseMs = Date.now() - startTime
         if (!res.ok) {
           // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
           // as definitive. Only treat 404 as definitive for non-CONFLICT URLs.
@@ -393,11 +397,12 @@ async function searchCourtCasesInternal(
         const text = await res.text()
         const data = JSON.parse(text)
         const items = Array.isArray(data) ? data : (data.data || [])
-        recordOutcome(worker, true)
+        recordOutcome(worker, true, undefined, responseMs)
         return items.map(mapper)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
-        recordOutcome(worker, false, msg)
+        const responseMs = Date.now() - startTime
+        recordOutcome(worker, false, msg, responseMs)
         throw new Error(msg)
       }
     })
@@ -432,6 +437,7 @@ async function searchCourtCasesInternal(
       await new Promise(r => setTimeout(r, 500))
 
       const retryPromises = proxyUrls.map(async ({ url: proxyUrl, worker }) => {
+        const startTime = Date.now()
         try {
           const res = await fetch(proxyUrl, {
             headers: {
@@ -442,6 +448,7 @@ async function searchCourtCasesInternal(
             },
             signal: AbortSignal.timeout(15000),
           })
+          const responseMs = Date.now() - startTime
           if (!res.ok) {
             const isConflict = url.includes('CONFLICT')
             if ((res.status === 404 || res.status === 410) && !isConflict) {
@@ -453,11 +460,12 @@ async function searchCourtCasesInternal(
           // v140: Don't treat text 'not found' as definitive (IP blocking issue)
           const data = JSON.parse(text)
           const items = Array.isArray(data) ? data : (data.data || [])
-          recordOutcome(worker, true)
+          recordOutcome(worker, true, undefined, responseMs)
           return items.map(mapper)
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e)
-          recordOutcome(worker, false, msg)
+          const responseMs = Date.now() - startTime
+          recordOutcome(worker, false, msg, responseMs)
           throw new Error(msg)
         }
       })
@@ -488,6 +496,7 @@ async function searchCourtCasesInternal(
         // unless everything is dead, in which case we fail open and try all.
         const finalWorkers = workerHealth.getRaceCandidates(originKey, allWorkers)
         const finalPromises = finalWorkers.map(async (w) => {
+          const startTime = Date.now()
           try {
             const res = await fetch(w + url, {
               headers: {
@@ -498,6 +507,7 @@ async function searchCourtCasesInternal(
               },
               signal: AbortSignal.timeout(20000),
             })
+            const responseMs = Date.now() - startTime
             if (!res.ok) {
               throw new Error(`HTTP ${res.status}`)
             }
@@ -505,10 +515,12 @@ async function searchCourtCasesInternal(
             // v140: Don't treat text 'not found' as definitive (IP blocking issue)
             const data = JSON.parse(text)
             const items = Array.isArray(data) ? data : (data.data || [])
-            recordOutcome(w, true)
+            recordOutcome(w, true, undefined, responseMs)
             return items.map(mapper)
           } catch (e) {
-            recordOutcome(w, false)
+            const responseMs = Date.now() - startTime
+            const msg = e instanceof Error ? e.message : String(e)
+            recordOutcome(w, false, msg, responseMs)
             throw e
           }
         })

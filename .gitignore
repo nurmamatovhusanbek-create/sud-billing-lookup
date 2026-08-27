@@ -78,3 +78,6 @@ agent-ctx/
 dev.log
 .zscripts/
 mini-services/
+
+# v158: Runtime worker config (managed by Settings UI)
+workers.json

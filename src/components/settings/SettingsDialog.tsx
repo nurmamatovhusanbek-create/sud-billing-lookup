@@ -27,9 +27,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="p-0 gap-0 flex flex-col"
-        style={{ maxWidth: 'none', width: '100vw', height: '100vh', borderRadius: 0, borderWidth: 0 }}
+        style={{ maxWidth: '95vw', width: '95vw', height: '92vh', maxHeight: '92vh' }}
       >
-        <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
+        <DialogHeader className="px-6 pt-6 pb-3 shrink-0 pr-12">
           <div className="flex items-center justify-between">
             <div>
               <DialogTitle className="flex items-center gap-2">

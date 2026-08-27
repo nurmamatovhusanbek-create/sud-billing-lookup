@@ -2877,6 +2877,44 @@ function WatchlistTab({
     fetchedRef.current.delete(tin)
   }
 
+  // v163: Refresh a single company's data (bypasses the fetchedRef guard)
+  const handleRefreshOne = useCallback((tin: string) => {
+    // Clear cached data so fetchWatchStats/fetchWatchRating get fresh data
+    clearCached(`watchlist-rating:${tin}`)
+    clearCached(cacheKey.upcoming(tin))
+    clearCached(cacheKey.stats(tin))
+    // Reset loading state
+    setSummaries((prev) => ({
+      ...prev,
+      [tin]: { loading: true, error: null },
+    }))
+    // Re-fetch all 3 data sources
+    const patch = (patchFn: (s: WatchSummary) => WatchSummary) =>
+      setSummaries((prev) => {
+        const cur: WatchSummary = prev[tin] ?? { loading: true, error: null }
+        return { ...prev, [tin]: patchFn(cur) }
+      })
+    void fetchWatchStats(tin).then(
+      (s) => patch((cur) => ({ ...cur, stats: s, loading: false })),
+      () => patch((cur) => ({ ...cur, loading: false })),
+    )
+    void fetchWatchRating(tin).then(
+      (r) => patch((cur) => ({ ...cur, rating: r })),
+      () => patch((cur) => ({ ...cur, rating: null })),
+    )
+    void fetchWatchNextHearing(tin).then(
+      (h) => patch((cur) => ({ ...cur, nextHearing: h })),
+      () => patch((cur) => ({ ...cur, nextHearing: null })),
+    )
+  }, [])
+
+  // v163: Refresh ALL companies (staggered 2s between each)
+  const handleRefreshAll = useCallback(() => {
+    entries.forEach((e, i) => {
+      setTimeout(() => handleRefreshOne(e.tin), i * 2000)
+    })
+  }, [entries, handleRefreshOne])
+
   return (
     <>
       {/* Search hero */}
@@ -2926,9 +2964,22 @@ function WatchlistTab({
 
       {/* Watchlist grid */}
       <div className="tab-section">
-        <div className="h-section">
-          <Eye className="w-3.5 h-3.5" />
-          Kuzatuvdagi kompaniyalar ({entries.length})
+        <div className="h-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Eye className="w-3.5 h-3.5" />
+            Kuzatuvdagi kompaniyalar ({entries.length})
+          </div>
+          {entries.length > 0 && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={handleRefreshAll}
+              style={{ fontSize: 12, gap: 4, padding: '4px 10px' }}
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Hammasini yangilash</span>
+            </button>
+          )}
         </div>
         {entries.length === 0 ? (
           <div className="panel" style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 13, borderStyle: 'dashed' }}>
@@ -2959,6 +3010,15 @@ function WatchlistTab({
                       <p className="wc-name">{c.name}</p>
                       <p className="wc-stir">STIR · {formatTin(c.tin)}</p>
                     </div>
+                    <button
+                      type="button"
+                      className="wc-trash"
+                      onClick={(e) => { e.stopPropagation(); handleRefreshOne(c.tin) }}
+                      aria-label="Yangilash"
+                      title="Yangilash"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       type="button"
                       className="wc-trash"

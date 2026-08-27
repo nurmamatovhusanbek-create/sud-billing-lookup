@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Check, X, Loader2, Plus, Trash2, FlaskConical, AlertCircle } from 'lucide-react'
+import { Check, X, Loader2, Plus, Trash2, FlaskConical, AlertCircle, Copy, FileCode } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface WorkerEntry {
   url: string
@@ -50,6 +51,7 @@ export function WorkersTab() {
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [copyingCode, setCopyingCode] = useState(false)
 
   const fetchWorkers = useCallback(async () => {
     setLoading(true)
@@ -157,12 +159,47 @@ export function WorkersTab() {
     fallback: 'Birlamchi',
   }
 
+  // v163: Copy CF Worker code to clipboard
+  const handleCopyCode = async () => {
+    setCopyingCode(true)
+    try {
+      const res = await fetch('/api/settings/workers/code')
+      const json = await res.json()
+      if (json.ok) {
+        await navigator.clipboard.writeText(json.code)
+        toast.success('Worker kodi nusxalandi!')
+      } else {
+        toast.error('Kodni o\'qib bo\'lmadi')
+      }
+    } catch (e) {
+      toast.error('Xato: ' + (e instanceof Error ? e.message : 'noma\'lum'))
+    } finally {
+      setCopyingCode(false)
+    }
+  }
+
   return (
     <div className="space-y-4 py-2">
-      {/* Source badge */}
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Manba:</span>
-        <Badge variant="outline">{sourceLabels[data?.source || 'fallback']}</Badge>
+      {/* Source badge + Copy code button */}
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Manba:</span>
+          <Badge variant="outline">{sourceLabels[data?.source || 'fallback']}</Badge>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopyCode}
+          disabled={copyingCode}
+          className="gap-1.5"
+        >
+          {copyingCode ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <FileCode className="w-3.5 h-3.5" />
+          )}
+          <span className="text-xs">Kodni nusxalash</span>
+        </Button>
       </div>
 
       {/* Add new worker */}
@@ -302,7 +339,8 @@ export function WorkersTab() {
                   >
                     <FlaskConical className="w-3.5 h-3.5" />
                   </Button>
-                  {data.source === 'file' && (
+                  {/* v163: Delete button always visible (user-added or fallback) */}
+                  {worker.addedAt && (
                     <Button
                       variant="ghost"
                       size="sm"

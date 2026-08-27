@@ -46,6 +46,8 @@ export function getLocalGitBranch(): string | null {
 
 /**
  * Check if the working tree is clean (no uncommitted changes).
+ * v163: Ignores auto-generated files (bun.lock, .next/, workers.json) that
+ * change during normal dev but don't block git pull.
  * Returns true if clean, false if dirty, null if git unavailable.
  */
 export function isWorkingTreeClean(): boolean | null {
@@ -55,7 +57,19 @@ export function isWorkingTreeClean(): boolean | null {
       timeout: 3000,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim()
-    return status.length === 0
+    if (status.length === 0) return true
+    // Filter out auto-generated files that don't block git pull
+    const ignorePatterns = [
+      'bun.lock',
+      '.next/',
+      'workers.json',
+      'dev.log',
+    ]
+    const realChanges = status
+      .split('\n')
+      .filter(line => line.trim().length > 0)
+      .filter(line => !ignorePatterns.some(p => line.includes(p)))
+    return realChanges.length === 0
   } catch {
     return null
   }

@@ -34,9 +34,9 @@ const REASON_LABELS: Record<string, string> = {
   timeout: 'Vaqt tugadi',
   http_502: '502 Bad Gateway',
   http_5xx: 'Server xatosi (5xx)',
-  http_4xx: 'Xato so\'rov (4xx)',
+  http_4xx: "Xato so'rov (4xx)",
   non_json: 'JSON emas',
-  wrong_shape: 'Noto\'g\'ri format',
+  wrong_shape: "Noto'g'ri format",
   network_error: 'Tarmoq xatosi',
   not_https: 'HTTPS emas',
 }
@@ -57,7 +57,7 @@ export function WorkersTab() {
       const json = await res.json()
       setData(json)
     } catch {
-      setError('Worker\'lar ro\'yxatini yuklab bo\'lmadi')
+      setError("Workerlar ro'yxatini yuklab bo'lmadi")
     } finally {
       setLoading(false)
     }
@@ -118,7 +118,7 @@ export function WorkersTab() {
         await fetchWorkers()
       } else {
         const errorMessages: Record<string, string> = {
-          invalid_url: 'URL noto\'g\'ri. HTTPS bo\'lishi va path bo\'lmasligi kerak',
+          invalid_url: "URL noto'g'ri. HTTPS bo'lishi va path bo'lmasligi kerak",
           duplicate: 'Bu worker allaqachon mavjud',
           missing_url: 'URL kiriting',
         }
@@ -169,7 +169,7 @@ export function WorkersTab() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Plus className="w-4 h-4" />
-            Yangi worker qo\'shish
+            Yangi worker qo'shish
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -205,7 +205,7 @@ export function WorkersTab() {
               ) : (
                 <Plus className="w-3.5 h-3.5" />
               )}
-              Qo\'shish
+              Qo'shish
             </Button>
           </div>
 
@@ -262,7 +262,7 @@ export function WorkersTab() {
         <CardContent className="space-y-2">
           {data?.workers.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
-              Workerlar yo\'q. Yuqoridagi form orqali qo\'shing.
+              Workerlar yo'q. Yuqoridagi form orqali qo'shing.
             </p>
           ) : (
             data?.workers.map((worker) => (
@@ -314,7 +314,7 @@ export function WorkersTab() {
       {data?.source !== 'file' && (
         <p className="text-xs text-muted-foreground text-center">
           Workerlar {sourceLabels[data?.source || 'fallback']} dan olingan.
-          workers.json faylidan boshqarish uchun yangi worker qo\'shing.
+          workers.json faylidan boshqarish uchun yangi worker qo'shing.
         </p>
       )}
     </div>

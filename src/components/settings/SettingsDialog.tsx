@@ -25,8 +25,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-3">
+      <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <DialogTitle className="flex items-center gap-2">
@@ -34,7 +34,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 Sozlamalar
               </DialogTitle>
               <DialogDescription className="mt-1">
-                Yangilanishlar, worker'lar va holatni boshqaring
+                Yangilanishlar, workerlar va holatni boshqaring
               </DialogDescription>
             </div>
             <Button
@@ -52,17 +52,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <Tabs
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as any)}
-          className="w-full"
+          className="w-full flex-1 flex flex-col min-h-0"
         >
-          <div className="px-6 pb-2">
+          <div className="px-6 pb-2 shrink-0">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="updates">Yangilanishlar</TabsTrigger>
-              <TabsTrigger value="workers">Worker'lar</TabsTrigger>
+              <TabsTrigger value="workers">Workerlar</TabsTrigger>
               <TabsTrigger value="health">Holat</TabsTrigger>
             </TabsList>
           </div>
 
-          <ScrollArea className="h-[60vh] px-6 pb-6">
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
             <TabsContent value="updates" className="mt-0">
               <UpdatesTab key={`updates-${refreshKey}`} />
             </TabsContent>
@@ -72,7 +72,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <TabsContent value="health" className="mt-0">
               <HealthTab key={`health-${refreshKey}`} />
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>

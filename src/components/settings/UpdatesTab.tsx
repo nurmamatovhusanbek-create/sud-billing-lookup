@@ -54,14 +54,14 @@ export function UpdatesTab() {
         setTimeout(() => fetchVersion(), 1000)
       } else {
         const errorMessages: Record<string, string> = {
-          dirty_tree: 'Kodda o\'zgarishlar bor. Avval commit qiling yoki stash qiling.',
+          dirty_tree: "Kodda o'zgarishlar bor. Avval commit qiling yoki stash qiling.",
           wrong_branch: `Faqat main branchida yangilash mumkin. Hozirgi: ${data.currentBranch}`,
-          git_unavailable: 'Git mavjud emas. Qo\'lda yangilang.',
+          git_unavailable: "Git mavjud emas. Qo'lda yangilang.",
           pull_failed: 'Git pull xatosi.',
         }
         setUpdateResult({
           ok: false,
-          message: errorMessages[data.error] || 'Noma\'lum xato',
+          message: errorMessages[data.error] || "Noma'lum xato",
           detail: data.detail || data.stderr || '',
         })
       }
@@ -88,7 +88,7 @@ export function UpdatesTab() {
     return (
       <div className="py-8 text-center text-muted-foreground">
         <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-        Ma\'lumot yuklanmadi
+        Ma'lumot yuklanmadi
       </div>
     )
   }
@@ -119,7 +119,7 @@ export function UpdatesTab() {
           {info.local.dirty && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Holat:</span>
-              <Badge variant="outline">O\'zgarishlar bor</Badge>
+              <Badge variant="outline">O'zgarishlar bor</Badge>
             </div>
           )}
         </CardContent>
@@ -130,10 +130,10 @@ export function UpdatesTab() {
         <Card>
           <CardContent className="py-4 text-center text-sm text-muted-foreground">
             <AlertCircle className="w-5 h-5 mx-auto mb-2" />
-            GitHub so\'rovlari cheklangan
+            GitHub so'rovlari cheklangan
             {info.retryAfterSec && (
               <div className="mt-1 text-xs">
-                {Math.ceil(info.retryAfterSec / 60)} daqiqadan keyin urinib ko\'ring
+                {Math.ceil(info.retryAfterSec / 60)} daqiqadan keyin urinib ko'ring
               </div>
             )}
           </CardContent>
@@ -141,7 +141,7 @@ export function UpdatesTab() {
       ) : info.remote ? (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">GitHub\'dagi so\'nggi versiya</CardTitle>
+            <CardTitle className="text-base">GitHub'dagi so'nggi versiya</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -196,7 +196,7 @@ export function UpdatesTab() {
             </Button>
             {info.local.dirty && (
               <p className="text-xs text-muted-foreground mt-2 text-center">
-                O\'zgarishlarni commit qiling yoki stash qiling
+                O'zgarishlarni commit qiling yoki stash qiling
               </p>
             )}
           </CardContent>
@@ -236,9 +236,9 @@ export function UpdatesTab() {
         <Card>
           <CardContent className="py-6 text-center">
             <Check className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm font-medium">Eng so\'nggi versiya</p>
+            <p className="text-sm font-medium">Eng so'nggi versiya</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Yangilanishlar yo\'q
+              Yangilanishlar yo'q
             </p>
           </CardContent>
         </Card>

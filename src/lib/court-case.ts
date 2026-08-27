@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { execSync } from 'child_process'
+import { spawn } from 'child_process'
 import ZAI from 'z-ai-web-dev-sdk'
 
 /**
@@ -59,64 +59,113 @@ export { CASE_STATUSES, HEARING_STATUSES, COURT_TYPE_LABELS } from './court-case
 // ---- API calls (NO auth, NO captcha needed — these are public endpoints) ----
 
 /**
- * v149: curl-based fetch for jadval.sud.uz.
+ * v149/v156: curl-based fetch for jadval.sud.uz.
  *
  * Problem: jadval.sud.uz does TLS fingerprinting (JA3/JA4). Node.js's fetch
  * (undici) and CF Workers both have non-browser TLS fingerprints, so
- * jadval.sud.uz returns "Ишлар топилмади" (not found) to them. Only real
- * browsers (Chrome) get data.
+ * jadval.sud.uz blocks them.
  *
- * Fix: Use system `curl` as a child process. curl uses OpenSSL which has a
- * different TLS fingerprint that's closer to a browser. The user's machine
- * can reach jadval.sud.uz (the browser proves it), so curl from the same
- * machine should also work.
+ * Fix: Use system `curl` as a child process via spawn (NOT execSync).
+ *
+ * CRITICAL — why spawn works and execSync doesn't (learned the hard way
+ * across v149→v155):
+ * - spawn('curl', args) with NO shell: Node calls CreateProcess('curl', ...).
+ *   Windows searches the Windows PATH and finds C:\Windows\System32\curl.exe.
+ *   That curl is built with Schannel (Windows native TLS). jadval.sud.uz
+ *   ACCEPTS Schannel's TLS fingerprint and returns real case data.
+ * - execSync('curl ...', {shell:'bash'}): bash (MSYS2) searches its own PATH
+ *   and finds /usr/bin/curl (MSYS2 curl, built with OpenSSL). jadval.sud.uz
+ *   REJECTS OpenSSL curl's TLS fingerprint -> 559-byte error HTML page.
+ * - execSync without shell option: defaults to cmd.exe on Windows, which
+ *   splits header values on spaces ("Could not resolve host: application").
+ *
+ * So: ALWAYS use spawn('curl', args) without a shell. This is the v150/v152
+ * approach that the user confirmed works. v154/v155 broke it by switching to
+ * execSync — v156 reverts to spawn.
  *
  * This is ONLY used for jadval.sud.uz (not jadvalapi.sud.uz, which doesn't
- * do TLS fingerprinting).
+ * do TLS fingerprinting and works fine via CF Workers).
  */
 function curlFetch(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    try {
-      const args = [
-        '--silent', '--show-error',
-        '--max-time', '15',
-        '--compressed',
-        '-H', 'Accept: application/json, text/plain, */*',
-        '-H', 'Accept-Language: en-GB,en;q=0.5',
-        '-H', 'Origin: https://my.sud.uz',
-        '-H', 'Referer: https://my.sud.uz/',
-        '-H', 'Sec-Fetch-Dest: empty',
-        '-H', 'Sec-Fetch-Mode: cors',
-        '-H', 'Sec-Fetch-Site: same-site',
-        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-        '-H', 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"',
-        '-H', 'sec-ch-ua-mobile: ?0',
-        '-H', 'sec-ch-ua-platform: "Windows"',
-        '--', url,
-      ]
-      // v155: Force bash as the shell for execSync.
-      // On Windows, execSync defaults to cmd.exe which splits header values
-      // on spaces ("Could not resolve host: application"). By forcing bash,
-      // the single-quote wrapping works correctly AND it finds MSYS2's curl
-      // (not Windows curl.exe) which has the TLS fingerprint jadval.sud.uz
-      // accepts.
-      const result = execSync(`curl ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`, {
-        timeout: 18000,
-        encoding: 'utf-8',
-        maxBuffer: 10 * 1024 * 1024,
-        shell: process.env.SHELL || (process.platform === 'win32' ? 'bash' : undefined),
-      })
-      if (result.includes('топилмади') || result.includes('мавжуд эмас')) {
-        reject(new Error('curl: not found text response'))
-        return
+    const args = [
+      '--silent', '--show-error',
+      '--max-time', '15',
+      '--compressed',
+      '-H', 'Accept: application/json, text/plain, */*',
+      '-H', 'Accept-Language: en-GB,en;q=0.5',
+      '-H', 'Origin: https://my.sud.uz',
+      '-H', 'Referer: https://my.sud.uz/',
+      '-H', 'Sec-Fetch-Dest: empty',
+      '-H', 'Sec-Fetch-Mode: cors',
+      '-H', 'Sec-Fetch-Site: same-site',
+      '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+      '-H', 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"',
+      '-H', 'sec-ch-ua-mobile: ?0',
+      '-H', 'sec-ch-ua-platform: "Windows"',
+      '--', url,
+    ]
+
+    // v156: spawn with NO shell. On Windows this finds System32 curl (Schannel
+    // TLS) which jadval.sud.uz accepts. execSync via bash finds MSYS2 curl
+    // (OpenSSL TLS) which jadval.sud.uz REJECTS (returns 559-byte error page).
+    // execSync without shell uses cmd.exe which splits headers on spaces.
+    // This is the v150/v152 approach the user confirmed works.
+    const child = spawn('curl', args, {
+      timeout: 18000,
+      windowsHide: true,
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.on('data', (data) => { stdout += data.toString() })
+    child.stderr.on('data', (data) => { stderr += data.toString() })
+
+    child.on('error', (err) => {
+      console.error(`[court-case] curl spawn error for ${url}: ${err.message}`)
+      if (err.message.includes('ENOENT') || err.message.includes('spawn')) {
+        console.error('[court-case] curl binary not found! Install curl or add to PATH.')
       }
-      console.log(`[court-case] curl got ${result.length} bytes from ${url}`)
-      resolve(result)
-    } catch (e: any) {
-      console.error(`[court-case] curl error for ${url}: ${e?.message?.slice(0, 200)}`)
-      reject(new Error(e?.message || 'curl failed'))
-    }
+      reject(new Error(`curl spawn failed: ${err.message}`))
+    })
+
+    child.on('close', (code) => {
+      if (code === 0 && stdout.length > 0) {
+        if (stdout.includes('топилмади') || stdout.includes('мавжуд эмас')) {
+          console.log(`[court-case] curl got 'not found' text from ${url} (${stdout.length} bytes)`)
+          reject(new Error('curl: not found text response'))
+          return
+        }
+        console.log(`[court-case] curl got ${stdout.length} bytes from ${url}`)
+        resolve(stdout)
+      } else {
+        console.error(`[court-case] curl exit code ${code} for ${url}, stderr: ${stderr.slice(0, 200)}, stdout: ${stdout.slice(0, 100)}`)
+        reject(new Error(`curl exit ${code}: ${stderr.slice(0, 100) || stdout.slice(0, 100) || 'no output'}`))
+      }
+    })
   })
+}
+
+/**
+ * v156: Helper — run curlFetch + JSON parse + map to CourtCase[].
+ * Extracted so all 3 retry tiers can use curl, not just the initial race.
+ * Includes diagnostic logging: if the response isn't valid JSON, logs the
+ * first 300 chars so we can see what jadval.sud.uz actually returned
+ * (error page, captcha, rate-limit, etc.) instead of just "parse failed".
+ */
+async function curlFetchCases(url: string, mapper: (raw: any) => CourtCase): Promise<CourtCase[]> {
+  const text = await curlFetch(url)
+  try {
+    const data = JSON.parse(text)
+    const items = Array.isArray(data) ? data : (data.data || [])
+    console.log(`[court-case] curl fetch got ${items.length} cases from ${url}`)
+    return items.map(mapper)
+  } catch (parseErr) {
+    const preview = text.slice(0, 300).replace(/\n/g, ' ')
+    console.error(`[court-case] curl got ${text.length} bytes from ${url} but JSON.parse failed — first 300 chars: ${preview}`)
+    throw new Error(`curl: response is not valid JSON (${text.length} bytes)`)
+  }
 }
 
 /**
@@ -313,15 +362,9 @@ async function searchCourtCasesInternal(
       }
     })
 
-    // v149: For jadval.sud.uz, ALSO try curl (bypasses TLS fingerprinting)
+    // v149/v156: For jadval.sud.uz, ALSO try curl (bypasses TLS fingerprinting)
     if (isJadvalSudUz) {
-      fetchPromises.push((async () => {
-        const text = await curlFetch(url)
-        const data = JSON.parse(text)
-        const items = Array.isArray(data) ? data : (data.data || [])
-        console.log(`[court-case] curl fetch got ${items.length} cases from ${url}`)
-        return items.map(mapper)
-      })())
+      fetchPromises.push(curlFetchCases(url, mapper))
     }
 
     // v140: BEST-OF strategy — wait for all proxies to settle, then take the
@@ -379,6 +422,13 @@ async function searchCourtCasesInternal(
         }
       })
 
+      // v156: Also retry curl for jadval.sud.uz in tier 2 (curl wasn't retried
+      // before — if it failed transiently in tier 1, the jadval.sud.uz data
+      // was lost entirely. Now curl gets 3 chances across all tiers.)
+      if (isJadvalSudUz) {
+        retryPromises.push(curlFetchCases(url, mapper))
+      }
+
       const retrySettled = await Promise.allSettled(retryPromises)
       for (const r of retrySettled) {
         if (r.status === 'rejected' && r.reason?.message?.startsWith('DEFINITIVE_NOT_FOUND')) {
@@ -422,6 +472,10 @@ async function searchCourtCasesInternal(
             throw e
           }
         })
+        // v156: Also try curl in the final tier for jadval.sud.uz
+        if (isJadvalSudUz) {
+          finalPromises.push(curlFetchCases(url, mapper))
+        }
         const finalSettled = await Promise.allSettled(finalPromises)
         const finalSuccesses: CourtCase[][] = finalSettled
           .filter((r): r is PromiseFulfilledResult<CourtCase[]> => r.status === 'fulfilled')

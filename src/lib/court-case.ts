@@ -1,6 +1,47 @@
 import crypto from 'crypto'
 import { spawn } from 'child_process'
+import fs from 'fs'
 import ZAI from 'z-ai-web-dev-sdk'
+
+/**
+ * v157: Resolve the CORRECT curl binary path.
+ *
+ * Problem: When running `bun run dev` from Git Bash (MINGW64) on Windows,
+ * Node.js inherits the MSYS2 PATH where /usr/bin/curl (OpenSSL TLS) comes
+ * BEFORE C:\Windows\System32\curl.exe (Schannel TLS). spawn('curl') then
+ * finds the OpenSSL curl, which jadval.sud.uz REJECTS with 502 Bad Gateway.
+ *
+ * Fix: On Windows, explicitly use C:\Windows\System32\curl.exe — the
+ * Schannel-based curl that jadval.sud.uz accepts. On Linux/Mac, use 'curl'
+ * from PATH (the system curl).
+ *
+ * This is logged once on first use so we can confirm the right binary.
+ */
+let _curlBinResolved = false
+let _curlBin = 'curl'
+
+function resolveCurlBinary(): string {
+  if (_curlBinResolved) return _curlBin
+
+  if (process.platform === 'win32') {
+    // Try System32 curl (Schannel TLS) — this is what jadval.sud.uz accepts
+    const system32Curl = 'C:\\Windows\\System32\\curl.exe'
+    if (fs.existsSync(system32Curl)) {
+      _curlBin = system32Curl
+      console.log(`[court-case] curl binary: ${_curlBin} (Windows System32 / Schannel TLS)`)
+    } else {
+      // Fall back to PATH lookup (may find MSYS2 curl — not ideal)
+      _curlBin = 'curl'
+      console.log(`[court-case] WARNING: C:\\Windows\\System32\\curl.exe not found, using PATH 'curl' (may get 502 from jadval.sud.uz)`)
+    }
+  } else {
+    _curlBin = 'curl'
+    console.log(`[court-case] curl binary: system 'curl' from PATH (Linux/Mac)`)
+  }
+
+  _curlBinResolved = true
+  return _curlBin
+}
 
 /**
  * my.sud.uz Court Case Search service.
@@ -106,12 +147,11 @@ function curlFetch(url: string): Promise<string> {
       '--', url,
     ]
 
-    // v156: spawn with NO shell. On Windows this finds System32 curl (Schannel
-    // TLS) which jadval.sud.uz accepts. execSync via bash finds MSYS2 curl
-    // (OpenSSL TLS) which jadval.sud.uz REJECTS (returns 559-byte error page).
-    // execSync without shell uses cmd.exe which splits headers on spaces.
-    // This is the v150/v152 approach the user confirmed works.
-    const child = spawn('curl', args, {
+    // v157: Use the explicitly resolved curl binary (System32 curl on Windows
+    // for Schannel TLS, system curl on Linux/Mac). This avoids the MSYS2
+    // OpenSSL curl that Git Bash's PATH would otherwise find.
+    const curlBin = resolveCurlBinary()
+    const child = spawn(curlBin, args, {
       timeout: 18000,
       windowsHide: true,
     })

@@ -2813,19 +2813,19 @@ function WatchlistTab({
   }, [])
 
   // On mount: load entries from localStorage AND kick off fetches for every
-  // saved entry. The setEntries call IS the standard "hydrate client state
-  // from localStorage on mount" pattern — it only runs once and the only
-  // re-render it triggers is the one that shows the loaded list. The
-  // kickOffFetch calls below fire 3 parallel API requests per company and
-  // patch per-company state independently (no cascade back into this effect).
+  // saved entry. v157: STAGGER the fetches (2s between each company) instead
+  // of firing all at once — firing 3 companies × 3 API calls = 9 simultaneous
+  // requests was flooding jadval.sud.uz and causing 502 Bad Gateway responses.
   useEffect(() => {
     const list = loadWatchlist()
     // Use queueMicrotask to avoid synchronous setState in effect (lint rule)
     queueMicrotask(() => {
       setEntries(list)
-      for (const e of list) {
-        kickOffFetch(e.tin)
-      }
+      // v157: Stagger fetches — 2s delay between each company so we don't
+      // hammer jadval.sud.uz with all companies at once on page load.
+      list.forEach((e, i) => {
+        setTimeout(() => kickOffFetch(e.tin), i * 2000)
+      })
     })
   }, [])
 
@@ -5099,7 +5099,7 @@ export default function Home() {
               </div>
               <div className="brand-text">
                 <h1 className="brand-title">Sud Billing Lookup</h1>
-                <p className="brand-sub">v156</p>
+                <p className="brand-sub">v157</p>
               </div>
             </div>
             <div className="header-right">
@@ -5587,9 +5587,9 @@ export default function Home() {
         </main>
 
         {/* ====================== FOOTER ====================== */}
-        <footer className="app-footer" data-version="v156">
+        <footer className="app-footer" data-version="v157">
           <div className="footer-inner">
-            <div className="footer-text">Sud Billing Lookup v156</div>
+            <div className="footer-text">Sud Billing Lookup v157</div>
           </div>
         </footer>
       </div>

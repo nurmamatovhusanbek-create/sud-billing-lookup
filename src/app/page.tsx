@@ -2964,20 +2964,19 @@ function WatchlistTab({
 
       {/* Watchlist grid */}
       <div className="tab-section">
-        <div className="h-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Eye className="w-3.5 h-3.5" />
-            Kuzatuvdagi kompaniyalar ({entries.length})
-          </div>
+        <div className="h-section" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Eye className="w-3.5 h-3.5" />
+          <span>Kuzatuvdagi kompaniyalar ({entries.length})</span>
           {entries.length > 0 && (
             <button
               type="button"
-              className="btn-ghost"
+              className="wc-trash"
               onClick={handleRefreshAll}
-              style={{ fontSize: 12, gap: 4, padding: '4px 10px' }}
+              aria-label="Hammasini yangilash"
+              title="Hammasini yangilash"
+              style={{ marginLeft: 4 }}
             >
-              <RefreshCw className="w-3 h-3" />
-              <span>Hammasini yangilash</span>
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

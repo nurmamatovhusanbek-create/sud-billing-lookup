@@ -47,7 +47,8 @@ export function HealthTab() {
 
   const fetchHealth = useCallback(async () => {
     try {
-      const res = await fetch('/api/settings/health')
+      // Cache-bust to always get fresh data
+      const res = await fetch(`/api/settings/health?_=${Date.now()}`)
       const json = await res.json()
       setData(json)
     } catch {
@@ -287,7 +288,7 @@ export function HealthTab() {
                 const hasDetails = w.lastFailureReason || w.lastResponseTimeMs !== null || w.lastUsedAt
 
                 return (
-                  <div key={w.url} className="border rounded-md">
+                  <div key={w.workerUrl} className="border rounded-md">
                     {/* Worker bar */}
                     <div className="p-3">
                       <div className="flex items-center justify-between gap-2 mb-2">

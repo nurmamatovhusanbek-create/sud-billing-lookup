@@ -135,14 +135,52 @@ export function getWorkerEntries(): WorkerEntry[] {
 
 /**
  * Add a worker URL to workers.json.
+ * v164: If workers.json doesn't exist yet, seed it with the current fallback/env
+ * workers FIRST, then add the new one. This prevents pre-set workers from
+ * disappearing when a user adds their first custom worker.
  * Returns the added entry, or null if duplicate/invalid.
  */
 export function addWorker(url: string): WorkerEntry | null {
   const normalized = normalizeWorkerUrl(url)
   if (!normalized) return null
 
-  const file = readWorkersFile()
-  const workers = file?.workers || []
+  let file = readWorkersFile()
+  let workers = file?.workers || []
+
+  // v164: If workers.json doesn't exist or is empty, seed with current
+  // fallback/env workers so they're not lost when the first custom worker
+  // is added.
+  if (workers.length === 0) {
+    // Inline the fallback worker list to avoid circular dependency
+    const FALLBACK = [
+      'https://broad-field-f2b0.uzwebfox.workers.dev/',
+      'https://wild-hall-04ae.uzwebfox.workers.dev/',
+      'https://orange-darkness-8843.najimsheikh071.workers.dev/',
+      'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
+    ]
+    // Also check env for custom workers
+    const envWorkers: string[] = []
+    const multi = process.env.CF_WORKER_URLS
+    if (multi) {
+      for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
+        envWorkers.push(u.endsWith('/') ? u : u + '/')
+      }
+    }
+    const single = process.env.CF_WORKER_URL
+    if (single) {
+      const normalized = single.endsWith('/') ? single : single + '/'
+      if (!envWorkers.includes(normalized)) envWorkers.push(normalized)
+    }
+    const currentWorkers = envWorkers.length > 0 ? envWorkers : FALLBACK
+    const now = new Date().toISOString()
+    workers = currentWorkers.map(w => ({
+      url: w,
+      addedAt: now,
+      lastTestedAt: null,
+      lastTestResult: null,
+    }))
+    console.log(`[workers-config] Seeded workers.json with ${workers.length} existing workers`)
+  }
 
   // Check for duplicates
   if (workers.some(w => w.url === normalized)) return null
